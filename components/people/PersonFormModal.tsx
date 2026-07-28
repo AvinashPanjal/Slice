@@ -150,13 +150,42 @@ export const PersonFormModal: React.FC<PersonFormModalProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            {person ? 'Save Changes' : 'Create Person'}
-          </Button>
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+          {person ? (
+            <Button
+              type="button"
+              variant="danger"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    `Are you sure you want to delete ${person.name}? WARNING: This action will also remove associated financial history records!`
+                  )
+                ) {
+                  return;
+                }
+                try {
+                  const { error } = await supabase.from('people').delete().eq('id', person.id);
+                  if (error) throw error;
+                  onSuccess();
+                  onClose();
+                } catch (err: any) {
+                  alert(err.message || 'Error deleting person');
+                }
+              }}
+            >
+              Delete Person
+            </Button>
+          ) : (
+            <div />
+          )}
+          <div className="flex items-center space-x-3">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isSubmitting}>
+              {person ? 'Save Changes' : 'Create Person'}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

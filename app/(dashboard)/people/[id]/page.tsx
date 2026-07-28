@@ -27,6 +27,7 @@ import {
   CreditCard,
   Calendar,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 
 export default function PersonDetailPage() {
@@ -94,6 +95,26 @@ export default function PersonDetailPage() {
   useEffect(() => {
     if (personId) fetchData();
   }, [personId]);
+
+  const handleDeleteLoan = async (loanId: string) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this loan record? This action will permanently remove this loan and all associated monthly dues and payment allocations.'
+      )
+    ) {
+      return;
+    }
+    try {
+      await supabase.from('payment_allocations').delete().eq('loan_id', loanId);
+      await supabase.from('adjustments').delete().eq('loan_id', loanId);
+      await supabase.from('monthly_dues').delete().eq('loan_id', loanId);
+      const { error } = await supabase.from('loans').delete().eq('id', loanId);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Error deleting loan record');
+    }
+  };
 
   if (loading || !person) {
     return (
@@ -300,6 +321,15 @@ export default function PersonDetailPage() {
                     onClick={() => setIsAddPaymentOpen(true)}
                   >
                     Add Payment
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                    title="Delete Loan"
+                    onClick={() => handleDeleteLoan(loan.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </Card>

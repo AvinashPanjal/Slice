@@ -12,7 +12,7 @@ import { calculateLoanRemaining, calculateTotalBorrowed } from '@/lib/calculatio
 import { formatINR } from '@/lib/utils/currency';
 import { formatDateDisplay } from '@/lib/utils/date';
 import { LoanFormModal } from '@/components/loans/LoanFormModal';
-import { CreditCard, Plus, Filter, User, UserCheck } from 'lucide-react';
+import { CreditCard, Plus, Filter, User, UserCheck, Trash2 } from 'lucide-react';
 
 export default function LoansPage() {
   const supabase = createClient();
@@ -64,6 +64,26 @@ export default function LoansPage() {
   useEffect(() => {
     fetchLoansData();
   }, []);
+
+  const handleDeleteLoan = async (loanId: string) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this loan record? This action will permanently remove this loan and all associated monthly dues and payment allocations.'
+      )
+    ) {
+      return;
+    }
+    try {
+      await supabase.from('payment_allocations').delete().eq('loan_id', loanId);
+      await supabase.from('adjustments').delete().eq('loan_id', loanId);
+      await supabase.from('monthly_dues').delete().eq('loan_id', loanId);
+      const { error } = await supabase.from('loans').delete().eq('id', loanId);
+      if (error) throw error;
+      fetchLoansData();
+    } catch (err: any) {
+      alert(err.message || 'Error deleting loan record');
+    }
+  };
 
   const filteredLoans = loans.filter((loan) => {
     if (borrowerTypeFilter !== 'ALL' && loan.borrower_type !== borrowerTypeFilter) return false;
@@ -191,13 +211,22 @@ export default function LoansPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full text-xs"
+                    className="flex-1 text-xs"
                     onClick={() => {
                       setEditingLoan(loan);
                       setIsLoanModalOpen(true);
                     }}
                   >
                     Edit Loan Details
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                    title="Delete Loan"
+                    onClick={() => handleDeleteLoan(loan.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
               </Card>

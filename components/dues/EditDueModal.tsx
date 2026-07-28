@@ -259,21 +259,41 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
           error={errors.adjustment_reason?.message}
         />
 
-        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
           <Button
-            type="submit"
-            isLoading={isSubmitting}
-            variant={actionType === 'WAIVE' ? 'danger' : 'primary'}
+            type="button"
+            variant="danger"
+            onClick={async () => {
+              if (!confirm('Are you sure you want to delete this monthly due record?')) return;
+              try {
+                await supabase.from('payment_allocations').delete().eq('monthly_due_id', due.id);
+                const { error } = await supabase.from('monthly_dues').delete().eq('id', due.id);
+                if (error) throw error;
+                onSuccess();
+                onClose();
+              } catch (err: any) {
+                alert(err.message || 'Error deleting due record');
+              }
+            }}
           >
-            {actionType === 'WAIVE'
-              ? 'Confirm Waiver'
-              : actionType === 'CARRY'
-              ? 'Carry Forward'
-              : 'Save Adjustment'}
+            Delete Due
           </Button>
+          <div className="flex items-center space-x-3">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              isLoading={isSubmitting}
+              variant={actionType === 'WAIVE' ? 'danger' : 'primary'}
+            >
+              {actionType === 'WAIVE'
+                ? 'Confirm Waiver'
+                : actionType === 'CARRY'
+                ? 'Carry Forward'
+                : 'Save Adjustment'}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

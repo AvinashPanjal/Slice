@@ -232,9 +232,17 @@ export default function PaymentsPage() {
                 </span>
                 <button
                   onClick={() => setSelectedPaymentDetail(pay)}
+                  title="View Payment Detail"
                   className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeletePayment(pay.id)}
+                  title="Delete / Void Payment"
+                  className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>

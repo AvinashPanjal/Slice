@@ -303,13 +303,45 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" isLoading={isSubmitting}>
-            {loan ? 'Save Changes' : 'Create Loan'}
-          </Button>
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+          {loan ? (
+            <Button
+              type="button"
+              variant="danger"
+              onClick={async () => {
+                if (
+                  !confirm(
+                    'Are you sure you want to delete this loan record? This action will permanently remove this loan and all associated monthly dues and payment allocations.'
+                  )
+                ) {
+                  return;
+                }
+                try {
+                  await supabase.from('payment_allocations').delete().eq('loan_id', loan.id);
+                  await supabase.from('adjustments').delete().eq('loan_id', loan.id);
+                  await supabase.from('monthly_dues').delete().eq('loan_id', loan.id);
+                  const { error } = await supabase.from('loans').delete().eq('id', loan.id);
+                  if (error) throw error;
+                  onSuccess();
+                  onClose();
+                } catch (err: any) {
+                  alert(err.message || 'Error deleting loan record');
+                }
+              }}
+            >
+              Delete Loan
+            </Button>
+          ) : (
+            <div />
+          )}
+          <div className="flex items-center space-x-3">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isSubmitting}>
+              {loan ? 'Save Changes' : 'Create Loan'}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>
