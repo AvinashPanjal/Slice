@@ -231,10 +231,12 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
         }
       }
 
-      // Update loan installment count
+      // Update loan installment count and sync original_amount to sum of all dues
+      const newTotalLoanAmount = editableDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
       await supabase
         .from('loans')
         .update({
+          original_amount: newTotalLoanAmount,
           installment_count: editableDues.length,
           default_due_amount: defaultAmount,
           default_due_day: dueDay,

@@ -143,6 +143,45 @@ export const deriveDueStatus = (
 };
 
 /**
+ * Helper to get active target dues for a person or dashboard.
+ * If current month's due is paid/passed, automatically rolls over to the NEXT upcoming unpaid due.
+ */
+export const getActiveTargetDues = (
+  allDues: MonthlyDue[],
+  allocations: PaymentAllocation[],
+  currentMonthStr: string,
+  todayStr: string
+): MonthlyDue[] => {
+  // 1. Dues for current month or overdue past dues that have remaining balance
+  const currentOrOverdueUnpaid = allDues.filter((d) => {
+    if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
+    const remaining = calculateDueRemaining(d, allocations);
+    return remaining > 0 && (d.due_month <= currentMonthStr || d.due_date <= todayStr);
+  });
+
+  if (currentOrOverdueUnpaid.length > 0) {
+    return currentOrOverdueUnpaid;
+  }
+
+  // 2. If current/past month dues are cleared, find the earliest NEXT upcoming unpaid due
+  const upcomingUnpaid = allDues
+    .filter((d) => {
+      if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
+      const remaining = calculateDueRemaining(d, allocations);
+      return remaining > 0 && d.due_date > todayStr;
+    })
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+  if (upcomingUnpaid.length > 0) {
+    const nextDueMonth = upcomingUnpaid[0].due_month;
+    return upcomingUnpaid.filter((d) => d.due_month === nextDueMonth);
+  }
+
+  // 3. Fallback: if all dues ever are paid, return current month dues list
+  return allDues.filter((d) => d.due_month === currentMonthStr);
+};
+
+/**
  * Aggregate complete financial profile summary for a Person
  */
 export const aggregatePersonSummary = (
@@ -178,14 +217,15 @@ export const aggregatePersonSummary = (
     Math.max(total_borrowed - total_paid - totalWaivers + totalAdd - totalSub, 0)
   );
 
-  const currentMonthDuesList = personDues.filter((d) => d.due_month === currentMonthStr);
+  // Use rolling active dues logic
+  const activeDuesList = getActiveTargetDues(personDues, allocations, currentMonthStr, todayStr);
 
   const current_month_due = roundMoney(
-    currentMonthDuesList.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0)
+    activeDuesList.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0)
   );
 
   const current_month_paid = roundMoney(
-    currentMonthDuesList.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0)
+    activeDuesList.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0)
   );
 
   const current_month_pending = roundMoney(
@@ -258,11 +298,12 @@ export const calculateDashboardStats = (
     Math.max(total_given - total_paid - totalWaivers + totalAdd - totalSub, 0)
   );
 
-  const currentMonthDues = dues.filter((d) => d.due_month === currentMonthStr);
+  const activeDashboardDues = getActiveTargetDues(dues, allocations, currentMonthStr, todayStr);
   const due_this_month = roundMoney(
-    currentMonthDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0)
+    activeDashboardDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0)
   );
 
+  const currentMonthDues = dues.filter((d) => d.due_month === currentMonthStr);
   const received_this_month = roundMoney(
     currentMonthDues.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0)
   );
@@ -280,7 +321,7 @@ export const calculateDashboardStats = (
   // Count distinct people with pending or overdue dues
   const pendingPersonIds = new Set<string>();
   dues.forEach((d) => {
-    if (d.person_id && (d.due_date <= todayStr || d.due_month === currentMonthStr)) {
+    if (d.person_id) {
       if (calculateDueRemaining(d, allocations) > 0 && d.status !== 'PAID' && d.status !== 'WAIVED' && d.status !== 'SKIPPED') {
         pendingPersonIds.add(d.person_id);
       }

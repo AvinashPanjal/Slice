@@ -179,6 +179,23 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
         });
       }
 
+      // Sync parent loan original_amount to match sum of dues
+      const { data: allDues } = await supabase
+        .from('monthly_dues')
+        .select('current_amount')
+        .eq('loan_id', due.loan_id);
+
+      if (allDues) {
+        const sumDues = allDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
+        await supabase
+          .from('loans')
+          .update({
+            original_amount: sumDues,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', due.loan_id);
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -244,45 +261,58 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
         {actionType === 'EDIT' && (
           <>
             <Input
-              label="Custom Due Amount (₹) *"
+              label="Current Due Amount (₹)"
               type="number"
-              {...register('current_amount')}
+              step="any"
+              min={0}
               error={errors.current_amount?.message}
+              {...register('current_amount', { valueAsNumber: true })}
             />
             <Input
-              label="Due Date *"
+              label="Due Date"
               type="date"
-              {...register('due_date')}
               error={errors.due_date?.message}
+              {...register('due_date')}
             />
           </>
         )}
 
+        {actionType === 'MARK_PAID' && (
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-xs text-emerald-800 dark:text-emerald-300">
+            This will mark this due as <strong>PAID</strong> for your loan payment history.
+          </div>
+        )}
+
+        {actionType === 'WAIVE' && (
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 rounded-xl border border-rose-200 dark:border-rose-900/60 text-xs text-rose-800 dark:text-rose-300">
+            Waiving this due will write off <strong>{formatINR(due.current_amount)}</strong> from the borrower&apos;s balance.
+          </div>
+        )}
+
         {actionType === 'CARRY' && (
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
-              Target Month (YYYY-MM) *
-            </label>
-            <input
-              type="month"
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
-              value={carryMonth}
-              onChange={(e) => setCarryMonth(e.target.value)}
-            />
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Carry forward <strong>{formatINR(due.current_amount)}</strong> to next month:
+            </p>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Target Month
+              </label>
+              <input
+                type="month"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none dark:bg-[#131b2e] dark:text-white"
+                value={carryMonth}
+                onChange={(e) => setCarryMonth(e.target.value)}
+              />
+            </div>
           </div>
         )}
 
         <Input
-          label="Reason for Modification *"
-          placeholder={
-            actionType === 'WAIVE'
-              ? 'e.g. Forgave remaining balance as a gift'
-              : actionType === 'CARRY'
-              ? 'e.g. Deferred to next month per request'
-              : 'e.g. Reduced payment agreed for August'
-          }
-          {...register('adjustment_reason')}
+          label="Reason / Notes (Optional)"
+          placeholder="e.g., Requested delay, salary credited late..."
           error={errors.adjustment_reason?.message}
+          {...register('adjustment_reason')}
         />
 
         <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -295,6 +325,19 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
                 await supabase.from('payment_allocations').delete().eq('monthly_due_id', due.id);
                 const { error } = await supabase.from('monthly_dues').delete().eq('id', due.id);
                 if (error) throw error;
+
+                // Sync parent loan amount after deletion
+                const { data: remainingDues } = await supabase
+                  .from('monthly_dues')
+                  .select('current_amount')
+                  .eq('loan_id', due.loan_id);
+
+                const newSum = (remainingDues || []).reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
+                await supabase
+                  .from('loans')
+                  .update({ original_amount: newSum, updated_at: new Date().toISOString() })
+                  .eq('id', due.loan_id);
+
                 onSuccess();
                 onClose();
               } catch (err: any) {
