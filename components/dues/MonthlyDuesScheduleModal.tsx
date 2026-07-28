@@ -178,6 +178,12 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
     );
   };
 
+  const handleStatusChange = (index: number, newStatus: string) => {
+    setEditableDues((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, status: newStatus } : item))
+    );
+  };
+
   const handleDeleteItem = (index: number) => {
     setEditableDues((prev) => prev.filter((_, idx) => idx !== index));
   };
@@ -205,6 +211,7 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
               due_date: d.due_date,
               current_amount: d.current_amount,
               original_amount: d.current_amount,
+              status: d.status,
               notes: d.notes || null,
               updated_at: new Date().toISOString(),
             })
@@ -218,7 +225,7 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
             due_date: d.due_date,
             original_amount: d.current_amount,
             current_amount: d.current_amount,
-            status: 'PENDING',
+            status: d.status || 'PENDING',
             notes: d.notes || null,
           });
         }
@@ -382,18 +389,45 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
                       <label className="block text-[9px] uppercase font-bold text-slate-400">Amount (₹)</label>
                       <input
                         type="number"
+                        step="any"
                         min={0}
-                        className="w-28 rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-bold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+                        className="w-24 rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-bold focus:outline-none dark:bg-[#131b2e] dark:text-white"
                         value={item.current_amount}
                         onChange={(e) => handleAmountChange(idx, parseFloat(e.target.value) || 0)}
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-[9px] uppercase font-bold text-slate-400">Status</label>
+                      <select
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+                        value={item.status}
+                        onChange={(e) => handleStatusChange(idx, e.target.value)}
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="PAID">Paid</option>
+                        <option value="PARTIALLY_PAID">Partially Paid</option>
+                        <option value="WAIVED">Waived</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(idx, item.status === 'PAID' ? 'PENDING' : 'PAID')}
+                      className={`px-2 py-1 rounded-xl text-xs font-bold transition-all border mt-3.5 ${
+                        item.status === 'PAID'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:border-emerald-800'
+                          : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {item.status === 'PAID' ? '✓ Paid' : 'Mark Paid'}
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(idx)}
                       title="Delete Month Due"
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 mt-3"
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 mt-3.5"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

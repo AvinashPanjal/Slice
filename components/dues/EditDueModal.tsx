@@ -25,7 +25,7 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
   onSuccess,
 }) => {
   const supabase = createClient();
-  const [actionType, setActionType] = useState<'EDIT' | 'WAIVE' | 'CARRY'>('EDIT');
+  const [actionType, setActionType] = useState<'EDIT' | 'WAIVE' | 'CARRY' | 'MARK_PAID'>('EDIT');
   const [carryMonth, setCarryMonth] = useState<string>('');
 
   const {
@@ -44,7 +44,6 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
         due_date: due.due_date,
         adjustment_reason: due.adjustment_reason || '',
       });
-      // Calculate next month default for carry forward
       const [year, month] = due.due_month.split('-');
       const nextDate = new Date(parseInt(year, 10), parseInt(month, 10), 1);
       const nextMonthStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
@@ -59,7 +58,28 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      if (actionType === 'EDIT') {
+      if (actionType === 'MARK_PAID') {
+        const { error } = await supabase
+          .from('monthly_dues')
+          .update({
+            status: 'PAID',
+            is_manually_adjusted: true,
+            adjustment_reason: data.adjustment_reason || 'Marked as paid for ongoing loan history',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', due.id);
+
+        if (error) throw error;
+
+        await supabase.from('activity_logs').insert({
+          user_id: userData.user.id,
+          entity_type: 'MONTHLY_DUE',
+          entity_id: due.id,
+          action: 'DUE_MARKED_PAID',
+          new_values: { amount: due.current_amount, status: 'PAID' },
+          reason: data.adjustment_reason || 'Marked as paid',
+        });
+      } else if (actionType === 'EDIT') {
         const { error } = await supabase
           .from('monthly_dues')
           .update({
@@ -73,7 +93,6 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
 
         if (error) throw error;
 
-        // Audit Log
         await supabase.from('activity_logs').insert({
           user_id: userData.user.id,
           entity_type: 'MONTHLY_DUE',
@@ -96,7 +115,6 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
 
         if (error) throw error;
 
-        // Record waiver adjustment
         await supabase.from('adjustments').insert({
           user_id: userData.user.id,
           person_id: due.person_id || null,
@@ -117,12 +135,10 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
           reason: data.adjustment_reason,
         });
       } else if (actionType === 'CARRY') {
-        // Carry forward remaining amount to target month
         const remainingAmount = data.current_amount;
         const dueDay = due.due_date.slice(-2);
         const targetDueDate = `${carryMonth}-${dueDay}`;
 
-        // Create new carried forward due in target month
         const { data: newCarriedDue, error: carryErr } = await supabase
           .from('monthly_dues')
           .insert({
@@ -143,7 +159,6 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
 
         if (carryErr) throw carryErr;
 
-        // Mark original due as SKIPPED or PAID depending on context
         await supabase
           .from('monthly_dues')
           .update({
@@ -179,11 +194,11 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Action Toggle */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <button
             type="button"
             onClick={() => setActionType('EDIT')}
-            className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
               actionType === 'EDIT'
                 ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700'
                 : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
@@ -193,25 +208,36 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setActionType('MARK_PAID')}
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
+              actionType === 'MARK_PAID'
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            Mark Paid
+          </button>
+          <button
+            type="button"
             onClick={() => setActionType('WAIVE')}
-            className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
               actionType === 'WAIVE'
                 ? 'bg-rose-600 text-white border-rose-600'
                 : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
-            Waive Due
+            Waive
           </button>
           <button
             type="button"
             onClick={() => setActionType('CARRY')}
-            className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
               actionType === 'CARRY'
                 ? 'bg-amber-600 text-white border-amber-600'
                 : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
-            Carry Forward
+            Carry
           </button>
         </div>
 
