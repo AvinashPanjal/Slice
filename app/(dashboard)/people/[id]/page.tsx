@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Person, Loan, MonthlyDue, PaymentAllocation, Adjustment, ActivityLog, LoanSource, ReminderTemplate } from '@/lib/types';
-import { aggregatePersonSummary, calculateLoanRemaining, calculateDuePaid, calculateDueRemaining } from '@/lib/calculations';
+import { aggregatePersonSummary, calculateLoanRemaining, calculateDuePaid, calculateDueRemaining, calculateTotalPaid } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
 import { formatDateDisplay, getCurrentMonthStr, getTodayStr, getDaysRemainingInfo } from '@/lib/utils/date';
 import { PersonFormModal } from '@/components/people/PersonFormModal';
@@ -247,12 +247,14 @@ export default function PersonDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {personLoans.map((loan, idx) => {
             const loanAllocations = allocations.filter((a) => a.loan_id === loan.id);
-            const paid = loanAllocations.reduce((acc, a) => acc + Number(a.amount), 0);
-            const remaining = calculateLoanRemaining(loan, allocations, adjustments);
+            const loanDues = personDues.filter((d) => d.loan_id === loan.id);
+            const paid = calculateTotalPaid(loanAllocations, loanDues);
+            const remaining = calculateLoanRemaining(loan, allocations, adjustments, personDues);
+            const totalScheduled = loanDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
 
             // Related due
             const currentDue = personDues.find(
-              (d) => d.loan_id === loan.id && d.due_month === currentMonth
+              (d) => d.loan_id === loan.id && (d.due_month === currentMonth || d.status !== 'PAID')
             );
 
             return (
@@ -269,17 +271,23 @@ export default function PersonDetailPage() {
                   <Badge status={loan.status} />
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-xs">
                   <div>
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Original</p>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Original Principal</p>
                     <p className="font-bold text-slate-900 dark:text-white">{formatINR(loan.original_amount)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold uppercase">Total w/ Interest</p>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400">
+                      {formatINR(totalScheduled > 0 ? totalScheduled : loan.original_amount)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Total Paid</p>
                     <p className="font-bold text-emerald-600">{formatINR(paid)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Remaining</p>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Remaining Balance</p>
                     <p className="font-extrabold text-amber-600">{formatINR(remaining)}</p>
                   </div>
                 </div>

@@ -107,8 +107,16 @@ export function getMonthlyDueDates(startDateStr: string, monthsCount: number, du
   const start = parseISO(startDateStr);
   let curYear = start.getFullYear();
   let curMonth = start.getMonth(); // 0-indexed
-
   const clampedDay = Math.min(Math.max(dueDay, 1), 31);
+
+  // If loan start date's day of month is on or after dueDay, first payment due is next month!
+  if (start.getDate() >= clampedDay) {
+    curMonth++;
+    if (curMonth > 11) {
+      curMonth = 0;
+      curYear++;
+    }
+  }
 
   for (let i = 0; i < monthsCount; i++) {
     const monthNum = curMonth + 1;

@@ -129,7 +129,7 @@ export default function DashboardPage() {
     today
   );
 
-  // Group pending/overdue dues by Person (and Myself) so each person gets ONE summary card
+  // Group ALL unpaid/upcoming dues by Person (and Myself) so every borrower with upcoming dues appears in the list
   const attentionGroupMap = new Map<string, PersonAttentionGroup>();
 
   dues.forEach((d) => {
@@ -137,33 +137,31 @@ export default function DashboardPage() {
     const remaining = calculateDueRemaining(d, allocations);
     if (remaining <= 0) return;
 
-    if (d.due_date <= today || d.status === 'PARTIALLY_PAID' || d.due_month === currentMonth) {
-      const groupKey = d.person_id || 'MYSELF';
-      const personObj = d.person_id ? people.find((p) => p.id === d.person_id) || null : null;
+    const groupKey = d.person_id || 'MYSELF';
+    const personObj = d.person_id ? people.find((p) => p.id === d.person_id) || null : null;
 
-      if (!attentionGroupMap.has(groupKey)) {
-        attentionGroupMap.set(groupKey, {
-          groupKey,
-          personId: d.person_id || null,
-          person: personObj,
-          totalPending: 0,
-          earliestDueDate: d.due_date,
-          duesCount: 0,
-          hasOverdue: false,
-          dueMonth: d.due_month,
-        });
-      }
+    if (!attentionGroupMap.has(groupKey)) {
+      attentionGroupMap.set(groupKey, {
+        groupKey,
+        personId: d.person_id || null,
+        person: personObj,
+        totalPending: 0,
+        earliestDueDate: d.due_date,
+        duesCount: 0,
+        hasOverdue: false,
+        dueMonth: d.due_month,
+      });
+    }
 
-      const grp = attentionGroupMap.get(groupKey)!;
-      grp.totalPending += remaining;
-      grp.duesCount += 1;
-      if (d.due_date < grp.earliestDueDate) {
-        grp.earliestDueDate = d.due_date;
-        grp.dueMonth = d.due_month;
-      }
-      if (d.due_date < today) {
-        grp.hasOverdue = true;
-      }
+    const grp = attentionGroupMap.get(groupKey)!;
+    grp.totalPending += remaining;
+    grp.duesCount += 1;
+    if (d.due_date < grp.earliestDueDate) {
+      grp.earliestDueDate = d.due_date;
+      grp.dueMonth = d.due_month;
+    }
+    if (d.due_date < today) {
+      grp.hasOverdue = true;
     }
   });
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { loanSchema, LoanFormData } from '@/lib/validation';
 import { Person, LoanSource, Loan } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { getTodayStr } from '@/lib/utils/date';
+import { getTodayStr, getMonthlyDueDates } from '@/lib/utils/date';
 
 interface LoanFormModalProps {
   isOpen: boolean;
@@ -140,22 +140,24 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
 
         if (error) throw error;
 
-        // Auto-generate initial monthly due for current month
+        // Auto-generate initial monthly dues using correct due date logic
         if (newLoan && data.default_due_amount && data.default_due_amount > 0) {
-          const takenYearMonth = data.taken_date.slice(0, 7);
-          const dueDay = String(data.default_due_day || 10).padStart(2, '0');
-          const dueDateStr = `${takenYearMonth}-${dueDay}`;
+          const installmentCount = data.installment_count || 1;
+          const dueDay = data.default_due_day || 5;
+          const dueSchedule = getMonthlyDueDates(data.taken_date, installmentCount, dueDay);
 
-          await supabase.from('monthly_dues').insert({
+          const duesToInsert = dueSchedule.map((d) => ({
             user_id: userData.user.id,
             loan_id: newLoan.id,
             person_id: data.borrower_type === 'PERSON' ? data.person_id : null,
-            due_month: takenYearMonth,
-            due_date: dueDateStr,
+            due_month: d.due_month,
+            due_date: d.due_date,
             original_amount: data.default_due_amount,
             current_amount: data.default_due_amount,
             status: 'PENDING',
-          });
+          }));
+
+          await supabase.from('monthly_dues').insert(duesToInsert);
         }
       }
 
