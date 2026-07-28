@@ -10,12 +10,13 @@ import { createClient } from '@/lib/supabase/client';
 import { Person, Loan, MonthlyDue, PaymentAllocation, Adjustment, ActivityLog, LoanSource, ReminderTemplate } from '@/lib/types';
 import { aggregatePersonSummary, calculateLoanRemaining, calculateDuePaid, calculateDueRemaining } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
-import { formatDateDisplay, getCurrentMonthStr, getTodayStr } from '@/lib/utils/date';
+import { formatDateDisplay, getCurrentMonthStr, getTodayStr, getDaysRemainingInfo } from '@/lib/utils/date';
 import { PersonFormModal } from '@/components/people/PersonFormModal';
 import { WhatsAppModal } from '@/components/people/WhatsAppModal';
 import { LoanFormModal } from '@/components/loans/LoanFormModal';
 import { PaymentFormModal } from '@/components/payments/PaymentFormModal';
 import { EditDueModal } from '@/components/dues/EditDueModal';
+import { MonthlyDuesScheduleModal } from '@/components/dues/MonthlyDuesScheduleModal';
 import { ActivityTimeline } from '@/components/audit/ActivityTimeline';
 import {
   User,
@@ -53,6 +54,7 @@ export default function PersonDetailPage() {
   const [isAddPaymentOpen, setIsAddPaymentOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
   const [selectedDueToEdit, setSelectedDueToEdit] = useState<MonthlyDue | null>(null);
+  const [selectedLoanForSchedule, setSelectedLoanForSchedule] = useState<Loan | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -283,54 +285,77 @@ export default function PersonDetailPage() {
                 </div>
 
                 {currentDue && (
-                  <div className="p-3 bg-blue-50/50 dark:bg-slate-800/80 rounded-xl border border-blue-100 dark:border-slate-700 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-slate-500">Current Month Due: </span>
-                      <span className="font-bold text-slate-900 dark:text-white">{formatINR(currentDue.current_amount)}</span>
-                      <span className="ml-2">
-                        <Badge status={currentDue.status} />
-                      </span>
+                  <div className="p-3 bg-blue-50/50 dark:bg-slate-800/80 rounded-xl border border-blue-100 dark:border-slate-700 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-slate-500 font-medium">Current Month Due ({currentDue.due_month}): </span>
+                        <span className="font-extrabold text-slate-900 dark:text-white ml-1">{formatINR(currentDue.current_amount)}</span>
+                      </div>
+                      <Badge status={currentDue.status} />
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs py-1 px-2"
-                      onClick={() => setSelectedDueToEdit(currentDue)}
-                    >
-                      Edit Due
-                    </Button>
+
+                    <div className="flex items-center justify-between pt-1">
+                      {(() => {
+                        const remInfo = getDaysRemainingInfo(currentDue.due_date, currentDue.status === 'PAID');
+                        return (
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
+                            {remInfo.label} (Due {formatDateDisplay(currentDue.due_date)})
+                          </span>
+                        );
+                      })()}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-xs py-0.5 px-2"
+                        onClick={() => setSelectedDueToEdit(currentDue)}
+                      >
+                        Edit Due
+                      </Button>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 text-xs"
-                    onClick={() => {
-                      setEditingLoan(loan);
-                      setIsAddLoanOpen(true);
-                    }}
+                    className="w-full text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200/80 dark:border-indigo-900/50"
+                    onClick={() => setSelectedLoanForSchedule(loan)}
                   >
-                    Edit Loan
+                    <Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                    Manage Monthly Dues Schedule ({loan.installment_count || 1} Mos)
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="success"
-                    className="flex-1 text-xs"
-                    onClick={() => setIsAddPaymentOpen(true)}
-                  >
-                    Add Payment
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
-                    title="Delete Loan"
-                    onClick={() => handleDeleteLoan(loan.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs"
+                      onClick={() => {
+                        setEditingLoan(loan);
+                        setIsAddLoanOpen(true);
+                      }}
+                    >
+                      Edit Loan
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="success"
+                      className="flex-1 text-xs"
+                      onClick={() => setIsAddPaymentOpen(true)}
+                    >
+                      Add Payment
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                      title="Delete Loan"
+                      onClick={() => handleDeleteLoan(loan.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -394,6 +419,16 @@ export default function PersonDetailPage() {
         due={selectedDueToEdit}
         onSuccess={fetchData}
       />
+
+      {/* Dues Schedule Modal */}
+      {selectedLoanForSchedule && (
+        <MonthlyDuesScheduleModal
+          isOpen={!!selectedLoanForSchedule}
+          onClose={() => setSelectedLoanForSchedule(null)}
+          loan={selectedLoanForSchedule}
+          onSuccess={fetchData}
+        />
+      )}
     </div>
   );
 }

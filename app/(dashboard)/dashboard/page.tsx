@@ -23,7 +23,7 @@ import {
   calculateDuePaid,
 } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
-import { formatDateDisplay, getCurrentMonthStr, getTodayStr } from '@/lib/utils/date';
+import { formatDateDisplay, getCurrentMonthStr, getTodayStr, getDaysRemainingInfo } from '@/lib/utils/date';
 import { WhatsAppModal } from '@/components/people/WhatsAppModal';
 import { PaymentFormModal } from '@/components/payments/PaymentFormModal';
 import {
@@ -247,12 +247,22 @@ export default function DashboardPage() {
                       <span className="text-slate-500">Due Month:</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-200">{due.due_month}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex items-center justify-between">
                       <span className="text-slate-500">Due Date:</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-200">
                         {formatDateDisplay(due.due_date)}
                       </span>
                     </div>
+                    {(() => {
+                      const remInfo = getDaysRemainingInfo(due.due_date, due.status === 'PAID');
+                      return (
+                        <div className="flex justify-end pt-0.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
+                            {remInfo.label}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex justify-between border-t border-slate-100 dark:border-slate-700 pt-1 mt-1">
                       <span className="text-slate-500">Pending Amount:</span>
                       <span className="font-extrabold text-rose-600 dark:text-rose-400">

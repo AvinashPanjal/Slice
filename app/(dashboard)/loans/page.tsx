@@ -12,7 +12,8 @@ import { calculateLoanRemaining, calculateTotalBorrowed } from '@/lib/calculatio
 import { formatINR } from '@/lib/utils/currency';
 import { formatDateDisplay } from '@/lib/utils/date';
 import { LoanFormModal } from '@/components/loans/LoanFormModal';
-import { CreditCard, Plus, Filter, User, UserCheck, Trash2 } from 'lucide-react';
+import { MonthlyDuesScheduleModal } from '@/components/dues/MonthlyDuesScheduleModal';
+import { CreditCard, Plus, Filter, User, UserCheck, Trash2, Calendar } from 'lucide-react';
 
 export default function LoansPage() {
   const supabase = createClient();
@@ -31,6 +32,7 @@ export default function LoansPage() {
   // Modal State
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [selectedLoanForSchedule, setSelectedLoanForSchedule] = useState<Loan | null>(null);
 
   const fetchLoansData = async () => {
     setLoading(true);
@@ -207,27 +209,39 @@ export default function LoansPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 text-xs"
-                    onClick={() => {
-                      setEditingLoan(loan);
-                      setIsLoanModalOpen(true);
-                    }}
+                    className="w-full text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200/80 dark:border-indigo-900/50"
+                    onClick={() => setSelectedLoanForSchedule(loan)}
                   >
-                    Edit Loan Details
+                    <Calendar className="w-3.5 h-3.5 mr-1.5 text-indigo-500" />
+                    Manage Monthly Dues Schedule ({loan.installment_count || 1} Mos)
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
-                    title="Delete Loan"
-                    onClick={() => handleDeleteLoan(loan.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 text-xs"
+                      onClick={() => {
+                        setEditingLoan(loan);
+                        setIsLoanModalOpen(true);
+                      }}
+                    >
+                      Edit Loan Details
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                      title="Delete Loan"
+                      onClick={() => handleDeleteLoan(loan.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             );
@@ -247,6 +261,16 @@ export default function LoansPage() {
         sources={sources}
         onSuccess={fetchLoansData}
       />
+
+      {/* Dues Schedule Modal */}
+      {selectedLoanForSchedule && (
+        <MonthlyDuesScheduleModal
+          isOpen={!!selectedLoanForSchedule}
+          onClose={() => setSelectedLoanForSchedule(null)}
+          loan={selectedLoanForSchedule}
+          onSuccess={fetchLoansData}
+        />
+      )}
     </div>
   );
 }

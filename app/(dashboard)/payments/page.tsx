@@ -10,10 +10,11 @@ import { Modal } from '@/components/ui/Modal';
 import { createClient } from '@/lib/supabase/client';
 import { Payment, MonthlyDue, PaymentAllocation, Person, Loan } from '@/lib/types';
 import { formatINR } from '@/lib/utils/currency';
-import { formatDateDisplay, formatMonthDisplay, getCurrentMonthStr } from '@/lib/utils/date';
+import { formatDateDisplay, formatMonthDisplay, getCurrentMonthStr, getDaysRemainingInfo } from '@/lib/utils/date';
 import { calculateDuePaid, calculateDueRemaining } from '@/lib/calculations';
 import { PaymentFormModal } from '@/components/payments/PaymentFormModal';
-import { Receipt, Plus, Calendar as CalendarIcon, Filter, Trash2, Eye } from 'lucide-react';
+import { EditDueModal } from '@/components/dues/EditDueModal';
+import { Receipt, Plus, Calendar as CalendarIcon, Filter, Trash2, Eye, Edit3 } from 'lucide-react';
 
 export default function PaymentsPage() {
   const supabase = createClient();
@@ -32,6 +33,7 @@ export default function PaymentsPage() {
   // Modals
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<Payment | null>(null);
+  const [selectedDueToEdit, setSelectedDueToEdit] = useState<MonthlyDue | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -172,6 +174,7 @@ export default function PaymentsPage() {
           {filteredDues.map((due) => {
             const paid = calculateDuePaid(due, allocations);
             const remaining = calculateDueRemaining(due, allocations);
+            const remInfo = getDaysRemainingInfo(due.due_date, due.status === 'PAID');
 
             return (
               <Card key={due.id} className="flex flex-col justify-between space-y-3">
@@ -181,6 +184,9 @@ export default function PaymentsPage() {
                       {due.person ? due.person.name : 'Myself'}
                     </h4>
                     <p className="text-xs text-slate-500">Due Date: {formatDateDisplay(due.due_date)}</p>
+                    <span className={`inline-block px-2 py-0.5 mt-1 rounded-md text-[10px] ${remInfo.badgeClass}`}>
+                      {remInfo.label}
+                    </span>
                   </div>
                   <Badge status={due.status} />
                 </div>
@@ -198,6 +204,18 @@ export default function PaymentsPage() {
                     <span className="text-slate-500">Remaining:</span>
                     <span className="font-extrabold text-amber-600">{formatINR(remaining)}</span>
                   </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => setSelectedDueToEdit(due)}
+                  >
+                    <Edit3 className="w-3.5 h-3.5 mr-1" />
+                    Edit / Waive Due
+                  </Button>
                 </div>
               </Card>
             );
@@ -309,6 +327,16 @@ export default function PaymentsPage() {
         allocations={allocations}
         onSuccess={fetchData}
       />
+
+      {/* Edit Due Modal */}
+      {selectedDueToEdit && (
+        <EditDueModal
+          isOpen={!!selectedDueToEdit}
+          onClose={() => setSelectedDueToEdit(null)}
+          due={selectedDueToEdit}
+          onSuccess={fetchData}
+        />
+      )}
     </div>
   );
 }

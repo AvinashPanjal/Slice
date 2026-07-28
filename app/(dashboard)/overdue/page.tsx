@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Person, MonthlyDue, PaymentAllocation, ReminderTemplate } from '@/lib/types';
 import { calculateDueRemaining } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
-import { formatDateDisplay, getTodayStr } from '@/lib/utils/date';
+import { formatDateDisplay, getTodayStr, getDaysRemainingInfo } from '@/lib/utils/date';
 import { WhatsAppModal } from '@/components/people/WhatsAppModal';
 import { AlertCircle, MessageSquare, CheckCircle, ShieldAlert } from 'lucide-react';
 
@@ -149,6 +149,7 @@ export default function OverduePage() {
               <div className="space-y-2">
                 {group.dues.map((due) => {
                   const rem = calculateDueRemaining(due, allocations);
+                  const remInfo = getDaysRemainingInfo(due.due_date, false);
                   return (
                     <div
                       key={due.id}
@@ -158,11 +159,16 @@ export default function OverduePage() {
                         <p className="font-bold text-slate-900 dark:text-white">
                           Due Date: {formatDateDisplay(due.due_date)} ({due.due_month})
                         </p>
-                        <p className="text-slate-500 text-[11px]">Original: {formatINR(due.current_amount)}</p>
+                        <span className={`inline-block px-2 py-0.5 mt-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
+                          {remInfo.label}
+                        </span>
                       </div>
-                      <span className="font-extrabold text-rose-600 dark:text-rose-400">
-                        {formatINR(rem)}
-                      </span>
+                      <div className="text-right">
+                        <p className="font-extrabold text-rose-600 dark:text-rose-400">
+                          {formatINR(rem)}
+                        </p>
+                        <p className="text-slate-400 text-[10px]">Orig: {formatINR(due.current_amount)}</p>
+                      </div>
                     </div>
                   );
                 })}
