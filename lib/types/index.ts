@@ -164,6 +164,7 @@ export interface DashboardStats {
   received_this_month: number;
   overdue_amount: number;
   pending_people_count: number;
+  next_due_date?: string | null;
 }
 
 export interface PersonFinancialSummary {

@@ -213,12 +213,14 @@ export default function DashboardPage() {
           <p className="text-[10px] text-slate-500 mt-2">Active balance</p>
         </Card>
 
-        <Card>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Due This Month</p>
-          <h3 className="text-xl sm:text-2xl font-black mt-1 tracking-tight text-slate-900 dark:text-white">
+        <Card className="border-blue-200 dark:border-blue-900/40 bg-blue-500/5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Target Next Due</p>
+          <h3 className="text-xl sm:text-2xl font-black mt-1 tracking-tight text-blue-600 dark:text-blue-400">
             {formatINR(stats.due_this_month)}
           </h3>
-          <p className="text-[10px] text-slate-500 mt-2">Current month target</p>
+          <p className="text-[10px] font-semibold text-slate-500 mt-2">
+            {stats.next_due_date ? `Due: ${formatDateDisplay(stats.next_due_date)}` : 'No upcoming due'}
+          </p>
         </Card>
 
         <Card className="border-emerald-200 dark:border-emerald-900/40 bg-emerald-500/5">
@@ -267,95 +269,105 @@ export default function DashboardPage() {
             description="Everyone has cleared their pending dues for this cycle."
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-2.5">
             {personAttentionList.map((grp) => {
               const remInfo = getDaysRemainingInfo(grp.earliestDueDate, false);
 
               return (
-                <Card
+                <div
                   key={grp.groupKey}
-                  className={`flex flex-col justify-between space-y-4 ${
-                    grp.hasOverdue ? 'border-rose-200 dark:border-rose-900/60 bg-rose-500/5' : ''
+                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    grp.hasOverdue
+                      ? 'border-rose-300 dark:border-rose-900/60 bg-rose-500/5'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131b2e]'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
+                  {/* Left: Borrower info */}
+                  <div className="flex items-center space-x-3 min-w-[200px]">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">
+                      {grp.person ? grp.person.name.charAt(0).toUpperCase() : 'M'}
+                    </div>
                     <div>
-                      {grp.person ? (
-                        <Link
-                          href={`/people/${grp.person.id}`}
-                          className="font-bold text-base text-slate-900 dark:text-white hover:underline"
-                        >
-                          {grp.person.name}
-                        </Link>
-                      ) : (
-                        <h4 className="font-bold text-base text-slate-900 dark:text-white">Myself</h4>
-                      )}
-                      <p className="text-xs text-slate-500">
-                        {grp.person?.phone ? `+91 ${grp.person.phone}` : 'Personal Loan Expense'}
+                      <div className="flex items-center space-x-2">
+                        {grp.person ? (
+                          <Link
+                            href={`/people/${grp.person.id}`}
+                            className="font-extrabold text-sm text-slate-900 dark:text-white hover:underline"
+                          >
+                            {grp.person.name}
+                          </Link>
+                        ) : (
+                          <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">Myself</h4>
+                        )}
+                        <Badge status={grp.hasOverdue ? 'OVERDUE' : 'PENDING'} />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {grp.person?.phone ? `+91 ${grp.person.phone}` : 'Personal Loan'}
                       </p>
                     </div>
-                    <Badge status={grp.hasOverdue ? 'OVERDUE' : 'PENDING'} />
                   </div>
 
-                  <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl space-y-1 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Earliest Due Date:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {/* Center: Upcoming Due Date & Pending Balance */}
+                  <div className="flex items-center space-x-6 text-xs">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Upcoming Due</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">
                         {formatDateDisplay(grp.earliestDueDate)}
+                      </p>
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] ${remInfo.badgeClass}`}>
+                        {remInfo.label}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center pt-0.5">
-                      <span className="text-slate-500">Scheduled Status:</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
-                        {remInfo.label} ({grp.duesCount} due{grp.duesCount > 1 ? 's' : ''})
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-t border-slate-100 dark:border-slate-700 pt-1.5 mt-1">
-                      <span className="text-slate-500 font-medium">Total Pending Balance:</span>
-                      <span className="font-extrabold text-rose-600 dark:text-rose-400">
+
+                    <div className="text-right sm:text-left border-l border-slate-100 dark:border-slate-800 pl-4">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Pending Amount</p>
+                      <p className="font-black text-sm text-rose-600 dark:text-rose-400">
                         {formatINR(grp.totalPending)}
-                      </span>
+                      </p>
+                      <p className="text-[10px] text-slate-400">{grp.duesCount} item(s)</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2 pt-2">
+                  {/* Right: Quick Action Buttons */}
+                  <div className="flex items-center space-x-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    {grp.person && (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 shadow-sm shadow-emerald-500/20"
+                        onClick={() =>
+                          setSelectedPersonForWhatsApp({
+                            person: grp.person!,
+                            dueAmount: grp.totalPending,
+                            paidAmount: 0,
+                            remainingAmount: grp.totalPending,
+                            dueDate: grp.earliestDueDate,
+                          })
+                        }
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 mr-1 text-white" />
+                        WhatsApp Alert
+                      </Button>
+                    )}
+
                     <Button
                       size="sm"
-                      variant="success"
-                      className="flex-1 text-xs"
+                      variant="outline"
+                      className="text-xs"
                       onClick={() => setPaymentModalPersonId(grp.personId)}
                     >
-                      <PlusCircle className="w-3.5 h-3.5 mr-1" />
-                      Record Payment
+                      <PlusCircle className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                      Payment
                     </Button>
+
                     {grp.person && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs"
-                          title="Send WhatsApp Reminder"
-                          onClick={() =>
-                            setSelectedPersonForWhatsApp({
-                              person: grp.person!,
-                              dueAmount: grp.totalPending,
-                              paidAmount: 0,
-                              remainingAmount: grp.totalPending,
-                              dueDate: grp.earliestDueDate,
-                            })
-                          }
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
+                      <Link href={`/people/${grp.person.id}`}>
+                        <Button size="sm" variant="outline" className="text-xs px-2.5" title="View Profile">
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
                         </Button>
-                        <Link href={`/people/${grp.person.id}`}>
-                          <Button size="sm" variant="outline" className="text-xs" title="View Profile">
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          </Button>
-                        </Link>
-                      </>
+                      </Link>
                     )}
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>

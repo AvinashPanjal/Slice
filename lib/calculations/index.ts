@@ -302,6 +302,7 @@ export const calculateDashboardStats = (
   const due_this_month = roundMoney(
     activeDashboardDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0)
   );
+  const next_due_date = activeDashboardDues.length > 0 ? activeDashboardDues[0].due_date : null;
 
   const currentMonthDues = dues.filter((d) => d.due_month === currentMonthStr);
   const received_this_month = roundMoney(
@@ -335,6 +336,7 @@ export const calculateDashboardStats = (
     received_this_month,
     overdue_amount,
     pending_people_count: pendingPersonIds.size,
+    next_due_date,
   };
 };
 
