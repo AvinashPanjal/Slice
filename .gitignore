@@ -1,0 +1,23 @@
+# LendWise - Supabase + Next.js
+.env.local
+.env
+
+# Next.js
+.next/
+out/
+node_modules/
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Build
+build/
+dist/
