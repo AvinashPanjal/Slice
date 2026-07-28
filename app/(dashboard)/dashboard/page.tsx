@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -29,11 +30,14 @@ import { PaymentFormModal } from '@/components/payments/PaymentFormModal';
 import {
   TrendingUp,
   AlertTriangle,
-  Clock,
+  Users,
   CheckCircle,
-  MessageSquare,
   PlusCircle,
-  UserCheck,
+  Receipt,
+  MessageSquare,
+  ArrowUpRight,
+  PieChart as PieChartIcon,
+  Eye,
 } from 'lucide-react';
 import {
   BarChart,
@@ -44,6 +48,17 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+
+interface PersonAttentionGroup {
+  groupKey: string;
+  personId: string | null;
+  person: Person | null;
+  totalPending: number;
+  earliestDueDate: string;
+  duesCount: number;
+  hasOverdue: boolean;
+  dueMonth: string;
+}
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -56,16 +71,15 @@ export default function DashboardPage() {
   const [people, setPeople] = useState<Person[]>([]);
   const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
 
-  // Action Modals
+  // Modal State
+  const [paymentModalPersonId, setPaymentModalPersonId] = useState<string | null>(null);
   const [selectedPersonForWhatsApp, setSelectedPersonForWhatsApp] = useState<{
     person: Person;
     dueAmount: number;
     paidAmount: number;
     remainingAmount: number;
-    dueDate?: string;
+    dueDate: string;
   } | null>(null);
-
-  const [paymentModalPersonId, setPaymentModalPersonId] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -115,11 +129,48 @@ export default function DashboardPage() {
     today
   );
 
-  // Identify "Needs Attention" Dues (Overdue, Due Today, Partial)
-  const needsAttentionDues = dues.filter((d) => {
-    if (d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
+  // Group pending/overdue dues by Person (and Myself) so each person gets ONE summary card
+  const attentionGroupMap = new Map<string, PersonAttentionGroup>();
+
+  dues.forEach((d) => {
+    if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return;
     const remaining = calculateDueRemaining(d, allocations);
-    return remaining > 0 && (d.due_date <= today || d.status === 'PARTIALLY_PAID');
+    if (remaining <= 0) return;
+
+    if (d.due_date <= today || d.status === 'PARTIALLY_PAID' || d.due_month === currentMonth) {
+      const groupKey = d.person_id || 'MYSELF';
+      const personObj = d.person_id ? people.find((p) => p.id === d.person_id) || null : null;
+
+      if (!attentionGroupMap.has(groupKey)) {
+        attentionGroupMap.set(groupKey, {
+          groupKey,
+          personId: d.person_id || null,
+          person: personObj,
+          totalPending: 0,
+          earliestDueDate: d.due_date,
+          duesCount: 0,
+          hasOverdue: false,
+          dueMonth: d.due_month,
+        });
+      }
+
+      const grp = attentionGroupMap.get(groupKey)!;
+      grp.totalPending += remaining;
+      grp.duesCount += 1;
+      if (d.due_date < grp.earliestDueDate) {
+        grp.earliestDueDate = d.due_date;
+        grp.dueMonth = d.due_month;
+      }
+      if (d.due_date < today) {
+        grp.hasOverdue = true;
+      }
+    }
+  });
+
+  const personAttentionList = Array.from(attentionGroupMap.values()).sort((a, b) => {
+    if (a.hasOverdue && !b.hasOverdue) return -1;
+    if (!a.hasOverdue && b.hasOverdue) return 1;
+    return a.earliestDueDate.localeCompare(b.earliestDueDate);
   });
 
   // Monthly Chart Data (Last 6 Months)
@@ -205,11 +256,11 @@ export default function DashboardPage() {
             </h2>
           </div>
           <span className="text-xs font-bold text-slate-400">
-            {needsAttentionDues.length} pending items
+            {personAttentionList.length} borrower{personAttentionList.length !== 1 ? 's' : ''} with pending dues
           </span>
         </div>
 
-        {needsAttentionDues.length === 0 ? (
+        {personAttentionList.length === 0 ? (
           <EmptyState
             icon={<CheckCircle className="w-6 h-6 text-emerald-500" />}
             title="All Clear! No Overdue Payments"
@@ -217,56 +268,52 @@ export default function DashboardPage() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {needsAttentionDues.slice(0, 6).map((due) => {
-              const person = people.find((p) => p.id === due.person_id);
-              const remaining = calculateDueRemaining(due, allocations);
-              const paid = calculateDuePaid(due, allocations);
-              const isOverdue = due.due_date < today;
+            {personAttentionList.map((grp) => {
+              const remInfo = getDaysRemainingInfo(grp.earliestDueDate, false);
 
               return (
                 <Card
-                  key={due.id}
+                  key={grp.groupKey}
                   className={`flex flex-col justify-between space-y-4 ${
-                    isOverdue ? 'border-rose-200 dark:border-rose-900/60 bg-rose-500/5' : ''
+                    grp.hasOverdue ? 'border-rose-200 dark:border-rose-900/60 bg-rose-500/5' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-bold text-base text-slate-900 dark:text-white">
-                        {person ? person.name : 'Myself'}
-                      </h4>
+                      {grp.person ? (
+                        <Link
+                          href={`/people/${grp.person.id}`}
+                          className="font-bold text-base text-slate-900 dark:text-white hover:underline"
+                        >
+                          {grp.person.name}
+                        </Link>
+                      ) : (
+                        <h4 className="font-bold text-base text-slate-900 dark:text-white">Myself</h4>
+                      )}
                       <p className="text-xs text-slate-500">
-                        {person?.phone ? `+91 ${person.phone}` : 'Personal Expense'}
+                        {grp.person?.phone ? `+91 ${grp.person.phone}` : 'Personal Loan Expense'}
                       </p>
                     </div>
-                    <Badge status={isOverdue ? 'OVERDUE' : due.status} />
+                    <Badge status={grp.hasOverdue ? 'OVERDUE' : 'PENDING'} />
                   </div>
 
                   <div className="p-3 bg-white/80 dark:bg-slate-800/80 rounded-xl space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Due Month:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{due.due_month}</span>
-                    </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Due Date:</span>
+                      <span className="text-slate-500">Earliest Due Date:</span>
                       <span className="font-semibold text-slate-700 dark:text-slate-200">
-                        {formatDateDisplay(due.due_date)}
+                        {formatDateDisplay(grp.earliestDueDate)}
                       </span>
                     </div>
-                    {(() => {
-                      const remInfo = getDaysRemainingInfo(due.due_date, due.status === 'PAID');
-                      return (
-                        <div className="flex justify-end pt-0.5">
-                          <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
-                            {remInfo.label}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                    <div className="flex justify-between border-t border-slate-100 dark:border-slate-700 pt-1 mt-1">
-                      <span className="text-slate-500">Pending Amount:</span>
+                    <div className="flex justify-between items-center pt-0.5">
+                      <span className="text-slate-500">Scheduled Status:</span>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
+                        {remInfo.label} ({grp.duesCount} due{grp.duesCount > 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-t border-slate-100 dark:border-slate-700 pt-1.5 mt-1">
+                      <span className="text-slate-500 font-medium">Total Pending Balance:</span>
                       <span className="font-extrabold text-rose-600 dark:text-rose-400">
-                        {formatINR(remaining)}
+                        {formatINR(grp.totalPending)}
                       </span>
                     </div>
                   </div>
@@ -276,28 +323,36 @@ export default function DashboardPage() {
                       size="sm"
                       variant="success"
                       className="flex-1 text-xs"
-                      onClick={() => setPaymentModalPersonId(due.person_id || null)}
+                      onClick={() => setPaymentModalPersonId(grp.personId)}
                     >
                       <PlusCircle className="w-3.5 h-3.5 mr-1" />
                       Record Payment
                     </Button>
-                    {person && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-xs"
-                        onClick={() =>
-                          setSelectedPersonForWhatsApp({
-                            person,
-                            dueAmount: due.current_amount,
-                            paidAmount: paid,
-                            remainingAmount: remaining,
-                            dueDate: due.due_date,
-                          })
-                        }
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
-                      </Button>
+                    {grp.person && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          title="Send WhatsApp Reminder"
+                          onClick={() =>
+                            setSelectedPersonForWhatsApp({
+                              person: grp.person!,
+                              dueAmount: grp.totalPending,
+                              paidAmount: 0,
+                              remainingAmount: grp.totalPending,
+                              dueDate: grp.earliestDueDate,
+                            })
+                          }
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
+                        </Button>
+                        <Link href={`/people/${grp.person.id}`}>
+                          <Button size="sm" variant="outline" className="text-xs" title="View Profile">
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          </Button>
+                        </Link>
+                      </>
                     )}
                   </div>
                 </Card>

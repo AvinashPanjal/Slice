@@ -17,12 +17,26 @@ export const calculateTotalBorrowed = (loans: Loan[]): number => {
 };
 
 /**
- * Sum all valid payment allocations
+ * Sum all valid payment allocations plus dues explicitly marked as PAID
  */
-export const calculateTotalPaid = (allocations: PaymentAllocation[]): number => {
-  return roundMoney(
-    allocations.reduce((acc, alloc) => acc + (Number(alloc.amount) || 0), 0)
+export const calculateTotalPaid = (
+  allocations: PaymentAllocation[] = [],
+  dues: MonthlyDue[] = []
+): number => {
+  const allocPaid = allocations.reduce(
+    (acc, alloc) => acc + (Number(alloc.amount) || 0),
+    0
   );
+  const paidDuesWithoutAlloc = dues.filter(
+    (d) =>
+      d.status === 'PAID' &&
+      !allocations.some((a) => a.monthly_due_id === d.id)
+  );
+  const paidDuesSum = paidDuesWithoutAlloc.reduce(
+    (acc, d) => acc + (Number(d.current_amount) || 0),
+    0
+  );
+  return roundMoney(allocPaid + paidDuesSum);
 };
 
 /**
@@ -30,19 +44,37 @@ export const calculateTotalPaid = (allocations: PaymentAllocation[]): number => 
  */
 export const calculateLoanRemaining = (
   loan: Loan,
-  allocations: PaymentAllocation[],
-  adjustments: Adjustment[] = []
+  allocations: PaymentAllocation[] = [],
+  adjustments: Adjustment[] = [],
+  dues: MonthlyDue[] = []
 ): number => {
   const original = Number(loan.original_amount) || 0;
   const loanAllocations = allocations.filter((a) => a.loan_id === loan.id);
-  const paid = loanAllocations.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+  let paid = loanAllocations.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+
+  // Add paid amount from dues explicitly marked as PAID without allocation record
+  const paidDuesWithoutAlloc = dues.filter(
+    (d) =>
+      d.loan_id === loan.id &&
+      d.status === 'PAID' &&
+      !loanAllocations.some((a) => a.monthly_due_id === d.id)
+  );
+  const paidDuesSum = paidDuesWithoutAlloc.reduce(
+    (acc, d) => acc + (Number(d.current_amount) || 0),
+    0
+  );
+  paid += paidDuesSum;
 
   const loanAdjustments = adjustments.filter((adj) => adj.loan_id === loan.id);
   const waived = loanAdjustments
     .filter((a) => a.adjustment_type === 'WAIVER')
     .reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
   const addCorrections = loanAdjustments
-    .filter((a) => a.adjustment_type === 'CORRECTION_ADD' || a.adjustment_type === 'OPENING_BALANCE')
+    .filter(
+      (a) =>
+        a.adjustment_type === 'CORRECTION_ADD' ||
+        a.adjustment_type === 'OPENING_BALANCE'
+    )
     .reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
   const subCorrections = loanAdjustments
     .filter((a) => a.adjustment_type === 'CORRECTION_SUB')
@@ -57,12 +89,15 @@ export const calculateLoanRemaining = (
  */
 export const calculateDuePaid = (
   due: MonthlyDue,
-  allocations: PaymentAllocation[]
+  allocations: PaymentAllocation[] = []
 ): number => {
+  const current = Number(due.current_amount) || 0;
   const dueAllocations = allocations.filter((a) => a.monthly_due_id === due.id);
-  return roundMoney(
-    dueAllocations.reduce((acc, a) => acc + (Number(a.amount) || 0), 0)
-  );
+  const allocSum = dueAllocations.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+  if (due.status === 'PAID') {
+    return roundMoney(Math.max(allocSum, current));
+  }
+  return roundMoney(allocSum);
 };
 
 /**
@@ -70,8 +105,11 @@ export const calculateDuePaid = (
  */
 export const calculateDueRemaining = (
   due: MonthlyDue,
-  allocations: PaymentAllocation[]
+  allocations: PaymentAllocation[] = []
 ): number => {
+  if (due.status === 'PAID' || due.status === 'WAIVED' || due.status === 'SKIPPED') {
+    return 0;
+  }
   const current = Number(due.current_amount) || 0;
   const paid = calculateDuePaid(due, allocations);
   return roundMoney(Math.max(current - paid, 0));
@@ -89,7 +127,7 @@ export const deriveDueStatus = (
     return due.status;
   }
   const current = Number(due.current_amount) || 0;
-  if (paid >= current && current > 0) {
+  if (due.status === 'PAID' || (paid >= current && current > 0)) {
     return 'PAID';
   }
   if (paid > 0) {
@@ -119,10 +157,11 @@ export const aggregatePersonSummary = (
   const personLoans = loans.filter((l) => l.person_id === person.id);
   const total_borrowed = calculateTotalBorrowed(personLoans);
 
+  const personDues = dues.filter((d) => d.person_id === person.id);
   const personAllocations = allocations.filter((a) =>
     personLoans.some((l) => l.id === a.loan_id)
   );
-  const total_paid = calculateTotalPaid(personAllocations);
+  const total_paid = calculateTotalPaid(personAllocations, personDues);
 
   const personAdjustments = adjustments.filter((adj) => adj.person_id === person.id);
   const totalWaivers = personAdjustments
@@ -139,7 +178,6 @@ export const aggregatePersonSummary = (
     Math.max(total_borrowed - total_paid - totalWaivers + totalAdd - totalSub, 0)
   );
 
-  const personDues = dues.filter((d) => d.person_id === person.id);
   const currentMonthDuesList = personDues.filter((d) => d.due_month === currentMonthStr);
 
   const current_month_due = roundMoney(
@@ -156,7 +194,7 @@ export const aggregatePersonSummary = (
 
   // Overdue dues: due_date < todayStr and not fully paid and not waived/skipped
   const overdueDues = personDues.filter((d) => {
-    if (d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
+    if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
     const remaining = calculateDueRemaining(d, allocations);
     return d.due_date < todayStr && remaining > 0;
   });
@@ -204,7 +242,7 @@ export const calculateDashboardStats = (
   todayStr: string = new Date().toISOString().split('T')[0]
 ): DashboardStats => {
   const total_given = calculateTotalBorrowed(loans);
-  const total_paid = calculateTotalPaid(allocations);
+  const total_paid = calculateTotalPaid(allocations, dues);
 
   const totalWaivers = adjustments
     .filter((a) => a.adjustment_type === 'WAIVER')
@@ -230,7 +268,7 @@ export const calculateDashboardStats = (
   );
 
   const overdueDues = dues.filter((d) => {
-    if (d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
+    if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
     const remaining = calculateDueRemaining(d, allocations);
     return d.due_date < todayStr && remaining > 0;
   });
@@ -243,7 +281,7 @@ export const calculateDashboardStats = (
   const pendingPersonIds = new Set<string>();
   dues.forEach((d) => {
     if (d.person_id && (d.due_date <= todayStr || d.due_month === currentMonthStr)) {
-      if (calculateDueRemaining(d, allocations) > 0 && d.status !== 'WAIVED' && d.status !== 'SKIPPED') {
+      if (calculateDueRemaining(d, allocations) > 0 && d.status !== 'PAID' && d.status !== 'WAIVED' && d.status !== 'SKIPPED') {
         pendingPersonIds.add(d.person_id);
       }
     }
@@ -277,7 +315,7 @@ export const autoAllocatePayment = (
 
   // Sort dues by due_date ascending (oldest first)
   const sortedDues = [...personDues]
-    .filter((d) => d.status !== 'WAIVED' && d.status !== 'SKIPPED')
+    .filter((d) => d.status !== 'PAID' && d.status !== 'WAIVED' && d.status !== 'SKIPPED')
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   for (const due of sortedDues) {
