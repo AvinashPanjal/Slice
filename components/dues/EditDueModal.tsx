@@ -179,23 +179,6 @@ export const EditDueModal: React.FC<EditDueModalProps> = ({
         });
       }
 
-      // Sync parent loan original_amount to match sum of dues
-      const { data: allDues } = await supabase
-        .from('monthly_dues')
-        .select('current_amount')
-        .eq('loan_id', due.loan_id);
-
-      if (allDues) {
-        const sumDues = allDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
-        await supabase
-          .from('loans')
-          .update({
-            original_amount: sumDues,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', due.loan_id);
-      }
-
       onSuccess();
       onClose();
     } catch (err: any) {
