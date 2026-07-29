@@ -48,14 +48,16 @@ export const calculateLoanRemaining = (
   adjustments: Adjustment[] = [],
   dues: MonthlyDue[] = []
 ): number => {
-  const original = Number(loan.original_amount) || 0;
+  const loanDues = dues.filter((d) => d.loan_id === loan.id);
+  const totalScheduled = loanDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
+  const targetTotal = totalScheduled > 0 ? totalScheduled : (Number(loan.original_amount) || 0);
+
   const loanAllocations = allocations.filter((a) => a.loan_id === loan.id);
   let paid = loanAllocations.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
 
   // Add paid amount from dues explicitly marked as PAID without allocation record
-  const paidDuesWithoutAlloc = dues.filter(
+  const paidDuesWithoutAlloc = loanDues.filter(
     (d) =>
-      d.loan_id === loan.id &&
       d.status === 'PAID' &&
       !loanAllocations.some((a) => a.monthly_due_id === d.id)
   );
@@ -80,7 +82,7 @@ export const calculateLoanRemaining = (
     .filter((a) => a.adjustment_type === 'CORRECTION_SUB')
     .reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
 
-  const remaining = original - paid - waived + addCorrections - subCorrections;
+  const remaining = targetTotal - paid - waived + addCorrections - subCorrections;
   return roundMoney(Math.max(remaining, 0));
 };
 
