@@ -251,11 +251,13 @@ export default function DashboardPage() {
         </Card>
 
         <Card className="border-emerald-200 dark:border-emerald-900/40 bg-emerald-500/5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Received</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Total Received</p>
           <h3 className="text-xl sm:text-2xl font-black mt-1 tracking-tight text-emerald-600 dark:text-emerald-400">
-            {formatINR(stats.received_this_month)}
+            {formatINR(stats.total_paid)}
           </h3>
-          <p className="text-[10px] text-slate-500 mt-2">Collected this month</p>
+          <p className="text-[10px] text-slate-500 mt-2">
+            {stats.received_this_month > 0 ? `${formatINR(stats.received_this_month)} in active cycle` : 'Total collected all-time'}
+          </p>
         </Card>
 
         <Card className="border-rose-200 dark:border-rose-900/40 bg-rose-500/5">

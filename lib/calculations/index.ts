@@ -294,6 +294,7 @@ export const calculateDashboardStats = (
     .filter((a) => a.adjustment_type === 'CORRECTION_SUB')
     .reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
 
+  // Exact math: TOTAL GIVEN - TOTAL PAID - WAIVERS
   const total_outstanding = roundMoney(
     Math.max(total_given - total_paid - totalWaivers + totalAdd - totalSub, 0)
   );
@@ -304,9 +305,9 @@ export const calculateDashboardStats = (
   );
   const next_due_date = activeDashboardDues.length > 0 ? activeDashboardDues[0].due_date : null;
 
-  const currentMonthDues = dues.filter((d) => d.due_month === currentMonthStr);
+  // Received for the active target cycle
   const received_this_month = roundMoney(
-    currentMonthDues.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0)
+    activeDashboardDues.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0)
   );
 
   const overdueDues = dues.filter((d) => {
@@ -331,6 +332,7 @@ export const calculateDashboardStats = (
 
   return {
     total_given,
+    total_paid,
     total_outstanding,
     due_this_month,
     received_this_month,

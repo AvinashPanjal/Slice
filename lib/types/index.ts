@@ -159,6 +159,7 @@ export interface ReminderTemplate {
 
 export interface DashboardStats {
   total_given: number;
+  total_paid: number;
   total_outstanding: number;
   due_this_month: number;
   received_this_month: number;
