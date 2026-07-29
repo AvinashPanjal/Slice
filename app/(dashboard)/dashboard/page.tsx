@@ -54,6 +54,7 @@ interface PersonAttentionGroup {
   personId: string | null;
   person: Person | null;
   totalPending: number;
+  nextDueId: string;
   earliestDueDate: string;
   duesCount: number;
   hasOverdue: boolean;
@@ -113,6 +114,25 @@ export default function DashboardPage() {
     }
   };
 
+  const handleQuickMarkPaid = async (dueId: string) => {
+    try {
+      const { error } = await supabase
+        .from('monthly_dues')
+        .update({
+          status: 'PAID',
+          is_manually_adjusted: true,
+          adjustment_reason: 'Quick marked paid from Dashboard',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', dueId);
+
+      if (error) throw error;
+      fetchDashboardData();
+    } catch (err: any) {
+      alert(err.message || 'Error marking due as paid');
+    }
+  };
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -129,13 +149,21 @@ export default function DashboardPage() {
     today
   );
 
-  // Group ALL unpaid/upcoming dues by Person (and Myself) so every borrower with upcoming dues appears in the list
+  // Group pending/overdue dues by Person. Shows ONLY next month's due amount and excludes far-future months (> 35 days out)
   const attentionGroupMap = new Map<string, PersonAttentionGroup>();
+
+  const todayDate = new Date();
+  const maxUpcomingDate = new Date();
+  maxUpcomingDate.setDate(todayDate.getDate() + 35);
+  const maxUpcomingStr = maxUpcomingDate.toISOString().split('T')[0];
 
   dues.forEach((d) => {
     if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return;
     const remaining = calculateDueRemaining(d, allocations);
     if (remaining <= 0) return;
+
+    // Only include dues that are OVERDUE or UPCOMING within next 35 days
+    if (d.due_date > maxUpcomingStr && d.due_date > today) return;
 
     const groupKey = d.person_id || 'MYSELF';
     const personObj = d.person_id ? people.find((p) => p.id === d.person_id) || null : null;
@@ -145,23 +173,24 @@ export default function DashboardPage() {
         groupKey,
         personId: d.person_id || null,
         person: personObj,
-        totalPending: 0,
+        totalPending: remaining, // NEXT MONTH'S DUE AMOUNT ONLY
+        nextDueId: d.id,
         earliestDueDate: d.due_date,
-        duesCount: 0,
-        hasOverdue: false,
+        duesCount: 1,
+        hasOverdue: d.due_date < today,
         dueMonth: d.due_month,
       });
-    }
-
-    const grp = attentionGroupMap.get(groupKey)!;
-    grp.totalPending += remaining;
-    grp.duesCount += 1;
-    if (d.due_date < grp.earliestDueDate) {
-      grp.earliestDueDate = d.due_date;
-      grp.dueMonth = d.due_month;
-    }
-    if (d.due_date < today) {
-      grp.hasOverdue = true;
+    } else {
+      const grp = attentionGroupMap.get(groupKey)!;
+      if (d.due_date < grp.earliestDueDate) {
+        grp.earliestDueDate = d.due_date;
+        grp.totalPending = remaining; // Use earliest next upcoming due amount
+        grp.nextDueId = d.id;
+        grp.dueMonth = d.due_month;
+      }
+      if (d.due_date < today) {
+        grp.hasOverdue = true;
+      }
     }
   });
 
@@ -328,10 +357,21 @@ export default function DashboardPage() {
 
                   {/* Right: Quick Action Buttons */}
                   <div className="flex items-center space-x-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 shadow-sm shadow-emerald-500/20"
+                      onClick={() => handleQuickMarkPaid(grp.nextDueId)}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5 mr-1 text-white" />
+                      Mark Paid
+                    </Button>
+
                     {grp.person && (
                       <Button
                         size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 shadow-sm shadow-emerald-500/20"
+                        variant="outline"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50"
+                        title="Send WhatsApp Reminder"
                         onClick={() =>
                           setSelectedPersonForWhatsApp({
                             person: grp.person!,
@@ -342,8 +382,8 @@ export default function DashboardPage() {
                           })
                         }
                       >
-                        <MessageSquare className="w-3.5 h-3.5 mr-1 text-white" />
-                        WhatsApp Alert
+                        <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                        WhatsApp
                       </Button>
                     )}
 

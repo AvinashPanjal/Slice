@@ -376,7 +376,7 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <div>
                       <label className="block text-[9px] uppercase font-bold text-slate-400">Due Date</label>
                       <input
@@ -393,7 +393,7 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
                         type="number"
                         step="any"
                         min={0}
-                        className="w-24 rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-bold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+                        className="w-20 sm:w-24 rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-bold focus:outline-none dark:bg-[#131b2e] dark:text-white"
                         value={item.current_amount}
                         onChange={(e) => handleAmountChange(idx, parseFloat(e.target.value) || 0)}
                       />
@@ -402,13 +402,13 @@ export const MonthlyDuesScheduleModal: React.FC<MonthlyDuesScheduleModalProps> =
                     <div>
                       <label className="block text-[9px] uppercase font-bold text-slate-400">Status</label>
                       <select
-                        className="rounded-xl border border-slate-200 dark:border-slate-800 px-2 py-1 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+                        className="rounded-xl border border-slate-200 dark:border-slate-800 px-1.5 py-1 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
                         value={item.status}
                         onChange={(e) => handleStatusChange(idx, e.target.value)}
                       >
                         <option value="PENDING">Pending</option>
                         <option value="PAID">Paid</option>
-                        <option value="PARTIALLY_PAID">Partially Paid</option>
+                        <option value="PARTIALLY_PAID">Partial</option>
                         <option value="WAIVED">Waived</option>
                       </select>
                     </div>
