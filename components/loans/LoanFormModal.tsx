@@ -46,7 +46,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
       borrower_type: 'PERSON',
       repayment_type: 'FIXED_EMI',
       taken_date: getTodayStr(),
-      default_due_day: 10,
+      default_due_day: 5,
     },
   });
 
@@ -61,10 +61,10 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
         loan_source_id: loan.loan_source_id || undefined,
         original_amount: loan.original_amount,
         default_due_amount: loan.default_due_amount || 0,
-        repayment_type: loan.repayment_type,
+        repayment_type: loan.repayment_type || 'FIXED_EMI',
         taken_date: loan.taken_date,
         first_due_date: loan.first_due_date || undefined,
-        default_due_day: loan.default_due_day || 10,
+        default_due_day: loan.default_due_day || 5,
         installment_count: loan.installment_count || undefined,
         notes: loan.notes || undefined,
       });
@@ -75,10 +75,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
         person_id: defaultPersonId || (people[0]?.id ?? undefined),
         loan_source_id: sources[0]?.id ?? undefined,
         original_amount: 5000,
-        default_due_amount: 1000,
+        default_due_amount: 481.60,
         repayment_type: 'FIXED_EMI',
         taken_date: getTodayStr(),
-        default_due_day: 10,
+        default_due_day: 5,
+        installment_count: 12,
       });
     }
   }, [loan, defaultPersonId, people, sources, reset, isOpen]);
@@ -225,51 +226,38 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
-              Loan Source App *
-            </label>
-            <select
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
-              {...register('loan_source_id')}
-            >
-              <option value="">None / Custom</option>
-              {sources.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+            Loan Source App *
+          </label>
+          <select
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
+            {...register('loan_source_id')}
+          >
+            <option value="">None / Custom</option>
+            {sources.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Original Amount (₹) *"
+            label="Original Principal Borrowed (₹) *"
             type="number"
+            step="any"
             placeholder="5000"
             {...register('original_amount')}
             error={errors.original_amount?.message}
           />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
-              Repayment Type *
-            </label>
-            <select
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
-              {...register('repayment_type')}
-            >
-              <option value="FIXED_EMI">Fixed EMI Monthly</option>
-              <option value="FLEXIBLE">Flexible Repayment</option>
-            </select>
-          </div>
 
           <Input
-            label="Default Monthly EMI / Due (₹)"
+            label="Monthly EMI Amount (₹) *"
             type="number"
-            placeholder="1000"
+            step="any"
+            placeholder="481.60"
             {...register('default_due_amount')}
             error={errors.default_due_amount?.message}
           />
@@ -277,21 +265,26 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
+            label="Number of Months (Tenure) *"
+            type="number"
+            min={1}
+            max={120}
+            placeholder="12"
+            {...register('installment_count')}
+            error={errors.installment_count?.message}
+          />
+
+          <Input
             label="Date Taken *"
             type="date"
             {...register('taken_date')}
             error={errors.taken_date?.message}
           />
-
-          <Input
-            label="Default Monthly Due Day (1-31)"
-            type="number"
-            min={1}
-            max={31}
-            {...register('default_due_day')}
-            error={errors.default_due_day?.message}
-          />
         </div>
+
+        <p className="text-[11px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+          ℹ️ Monthly EMI dues are automatically set to the <strong>5th of every month</strong> starting from the next cycle after the loan taken date.
+        </p>
 
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">

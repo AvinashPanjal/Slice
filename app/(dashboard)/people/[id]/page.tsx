@@ -252,10 +252,12 @@ export default function PersonDetailPage() {
             const remaining = calculateLoanRemaining(loan, allocations, adjustments, personDues);
             const totalScheduled = loanDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
 
-            // Related due
-            const currentDue = personDues.find(
-              (d) => d.loan_id === loan.id && (d.due_month === currentMonth || d.status !== 'PAID')
-            );
+            // Active / Next Upcoming Unpaid Due for this loan
+            const activeUnpaidDues = personDues
+              .filter((d) => d.loan_id === loan.id && d.status !== 'PAID' && d.status !== 'WAIVED' && d.status !== 'SKIPPED')
+              .sort((a, b) => a.due_date.localeCompare(b.due_date));
+
+            const upcomingDue = activeUnpaidDues[0] || null;
 
             return (
               <Card key={loan.id} className="space-y-4">
@@ -292,22 +294,22 @@ export default function PersonDetailPage() {
                   </div>
                 </div>
 
-                {currentDue && (
+                {upcomingDue ? (
                   <div className="p-3 bg-blue-50/50 dark:bg-slate-800/80 rounded-xl border border-blue-100 dark:border-slate-700 space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-slate-500 font-medium">Current Month Due ({currentDue.due_month}): </span>
-                        <span className="font-extrabold text-slate-900 dark:text-white ml-1">{formatINR(currentDue.current_amount)}</span>
+                        <span className="text-slate-500 font-medium">Next Upcoming Due ({formatDateDisplay(upcomingDue.due_date)}): </span>
+                        <span className="font-extrabold text-slate-900 dark:text-white ml-1">{formatINR(upcomingDue.current_amount)}</span>
                       </div>
-                      <Badge status={currentDue.status} />
+                      <Badge status={upcomingDue.status} />
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
                       {(() => {
-                        const remInfo = getDaysRemainingInfo(currentDue.due_date, currentDue.status === 'PAID');
+                        const remInfo = getDaysRemainingInfo(upcomingDue.due_date, upcomingDue.status === 'PAID');
                         return (
                           <span className={`px-2 py-0.5 rounded-md text-[10px] ${remInfo.badgeClass}`}>
-                            {remInfo.label} (Due {formatDateDisplay(currentDue.due_date)})
+                            {remInfo.label}
                           </span>
                         );
                       })()}
@@ -315,11 +317,15 @@ export default function PersonDetailPage() {
                         size="sm"
                         variant="outline"
                         className="text-xs py-0.5 px-2"
-                        onClick={() => setSelectedDueToEdit(currentDue)}
+                        onClick={() => setSelectedDueToEdit(upcomingDue)}
                       >
                         Edit Due
                       </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">✓ All monthly dues settled!</span>
                   </div>
                 )}
 
