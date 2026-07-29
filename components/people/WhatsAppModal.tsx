@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Person, ReminderTemplate } from '@/lib/types';
-import { buildReminderMessage, generateWhatsAppLink } from '@/lib/whatsapp';
+import { buildReminderMessage, generateWhatsAppLink, DEFAULT_UPI_ID } from '@/lib/whatsapp';
 import { MessageSquare, ExternalLink } from 'lucide-react';
 import { getCurrentMonthStr } from '@/lib/utils/date';
 
@@ -30,14 +30,14 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   templates = [],
 }) => {
   const [selectedTemplateType, setSelectedTemplateType] = useState<'NORMAL' | 'UPCOMING' | 'OVERDUE' | 'PARTIAL'>('NORMAL');
-  const [upiId, setUpiId] = useState('');
+  const [upiId, setUpiId] = useState(DEFAULT_UPI_ID);
   const [message, setMessage] = useState('');
 
   const currentMonth = getCurrentMonthStr();
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedUpi = localStorage.getItem('lendwise_upi_id') || '';
+      const savedUpi = localStorage.getItem('lendwise_upi_id') || DEFAULT_UPI_ID;
       setUpiId(savedUpi);
     }
   }, [isOpen]);

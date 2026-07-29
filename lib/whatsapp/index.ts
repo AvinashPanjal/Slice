@@ -41,6 +41,8 @@ export function generateUPILink(upiId: string, payeeName: string, amount: number
   return `upi://pay?pa=${cleanUPI}&pn=${encodedName}&am=${amount}&tn=${encodedNote}&cu=INR`;
 }
 
+export const DEFAULT_UPI_ID = 'avinashpanjal5@okhdfcbank';
+
 /**
  * Replaces placeholders in reminder template with actual values
  */
@@ -59,8 +61,10 @@ export function buildReminderMessage(params: ReminderParams): string {
     .replace(/₹\s*{paid_amount}/g, '{paid_amount}')
     .replace(/₹\s*{remaining_amount}/g, '{remaining_amount}');
 
-  const upiUri = params.upiId
-    ? generateUPILink(params.upiId, 'LendWise', params.remainingAmount, `${formatMonthDisplay(params.month)} EMI`)
+  const effectiveUpi = params.upiId || DEFAULT_UPI_ID;
+
+  const upiUri = effectiveUpi
+    ? generateUPILink(effectiveUpi, 'LendWise', params.remainingAmount, `${formatMonthDisplay(params.month)} EMI`)
     : '';
 
   const upiText = upiUri ? `👉 *Pay via UPI (GPay/PhonePe/Paytm):*\n${upiUri}` : '';

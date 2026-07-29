@@ -8,6 +8,7 @@ import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Profile, ReminderTemplate } from '@/lib/types';
 import { Settings as SettingsIcon, Save, MessageSquare, ShieldCheck } from 'lucide-react';
+import { requestNotificationPermission, sendLocalNotification } from '@/lib/utils/notifications';
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -20,14 +21,19 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [countryCode, setCountryCode] = useState('+91');
-  const [upiId, setUpiId] = useState('');
+  const [upiId, setUpiId] = useState('avinashpanjal5@okhdfcbank');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [notifGranted, setNotifGranted] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedUpi = localStorage.getItem('lendwise_upi_id') || '';
-      if (savedUpi) setUpiId(savedUpi);
+      const savedUpi = localStorage.getItem('lendwise_upi_id') || 'avinashpanjal5@okhdfcbank';
+      setUpiId(savedUpi);
+
+      if ('Notification' in window && Notification.permission === 'granted') {
+        setNotifGranted(true);
+      }
 
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
@@ -107,6 +113,19 @@ export default function SettingsPage() {
     }
   };
 
+  const handleToggleNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      setNotifGranted(true);
+      sendLocalNotification('🔔 LendWise Notifications Enabled!', {
+        body: 'You will now receive alerts for 5th-of-the-month EMI due dates & pending repayments.',
+      });
+      alert('Notification permissions granted! Test alert sent.');
+    } else {
+      alert('Notification permissions were not granted. Please allow notifications in your browser settings.');
+    }
+  };
+
   const handleInstallPWA = async () => {
     if (!deferredPrompt) {
       alert('To add LendWise to your Home Screen: Tap your browser menu (⋮ or share icon) and select "Add to Home Screen" or "Install App".');
@@ -149,23 +168,39 @@ export default function SettingsPage() {
         <p className="text-xs text-slate-500">Configure profile, default currency, UPI address, and PWA installation</p>
       </div>
 
-      {/* Add to Home Screen (PWA) Card */}
-      <Card className="p-6 space-y-4 border-l-4 border-l-indigo-500">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Add to Home Screen (PWA) Card */}
+        <Card className="p-5 space-y-3 border-l-4 border-l-indigo-500">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center">
-              📱 Install LendWise App (Add to Home Screen)
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center">
+              📱 Install App (Add to Home Screen)
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Access LendWise like a native app directly from your mobile home screen or desktop.
+              Runs full-screen as a native mobile app without the browser address bar.
             </p>
           </div>
 
-          <Button onClick={handleInstallPWA} variant="primary" className="shadow-md shrink-0">
+          <Button onClick={handleInstallPWA} variant="primary" size="sm" className="shadow-md w-full">
             {isInstalled ? '✓ App Installed' : '📲 Add to Home Screen'}
           </Button>
-        </div>
-      </Card>
+        </Card>
+
+        {/* Due Date Push Notifications Card */}
+        <Card className="p-5 space-y-3 border-l-4 border-l-emerald-500">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center">
+              🔔 Mobile & Desktop Push Notifications
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Get automatic OS push alerts for upcoming 5th EMI due dates & pending dues.
+            </p>
+          </div>
+
+          <Button onClick={handleToggleNotifications} variant={notifGranted ? 'outline' : 'primary'} size="sm" className="shadow-md w-full">
+            {notifGranted ? '✓ Notifications Active' : '🔔 Enable Notifications'}
+          </Button>
+        </Card>
+      </div>
 
       {/* Profile Preferences */}
       <Card className="p-6 space-y-6">
