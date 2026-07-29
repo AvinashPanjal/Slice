@@ -14,7 +14,7 @@ import { calculateTotalBorrowed, calculateLoanRemaining, calculateTotalPaid, cal
 import { formatINR } from '@/lib/utils/currency';
 import { formatDateDisplay, getCurrentMonthStr, getTodayStr, formatMonthDisplay, getDaysRemainingInfo } from '@/lib/utils/date';
 import { WhatsAppModal } from '@/components/people/WhatsAppModal';
-import { Building2, Plus, Trash2, CreditCard, Calendar, CheckCircle, MessageSquare, PlusCircle } from 'lucide-react';
+import { Building2, Plus, Trash2, CreditCard, Calendar, CheckCircle, MessageSquare, PlusCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function LoanSourcesPage() {
   const supabase = createClient();
@@ -134,11 +134,25 @@ export default function LoanSourcesPage() {
     }
   };
 
-  // Get all unique due months present in data for month tabs
+  // Get all unique due months present in data for month tabs, sorted chronologically
   const availableMonths = Array.from(new Set(dues.map((d) => d.due_month))).sort();
-  if (!availableMonths.includes('2026-08')) availableMonths.push('2026-08');
-  if (!availableMonths.includes('2026-07')) availableMonths.push('2026-07');
+  if (!availableMonths.includes(currentMonth)) availableMonths.push(currentMonth);
   availableMonths.sort();
+
+  // Find index of selectedMonth for prev/next navigation
+  const selectedIndex = availableMonths.indexOf(selectedMonth);
+
+  const handlePrevMonth = () => {
+    if (selectedIndex > 0) {
+      setSelectedMonth(availableMonths[selectedIndex - 1]);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedIndex < availableMonths.length - 1) {
+      setSelectedMonth(availableMonths[selectedIndex + 1]);
+    }
+  };
 
   if (loading) {
     return (
@@ -244,23 +258,65 @@ export default function LoanSourcesPage() {
             <p className="text-xs text-slate-500">Monthly schedule breakdown per borrower for platform sources</p>
           </div>
 
-          {/* Month Selector Tabs */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {availableMonths.map((mStr) => (
+          {/* Month Selector Controls */}
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              disabled={selectedIndex <= 0}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131b2e] text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-slate-50 transition-all text-xs font-bold shrink-0"
+              title="Previous Month"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-extrabold focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white shadow-sm cursor-pointer"
+            >
+              {availableMonths.map((mStr) => (
+                <option key={mStr} value={mStr}>
+                  {formatMonthDisplay(mStr)} {mStr === currentMonth ? '★ (Active Cycle)' : ''}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              disabled={selectedIndex >= availableMonths.length - 1}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131b2e] text-slate-600 dark:text-slate-300 disabled:opacity-30 hover:bg-slate-50 transition-all text-xs font-bold shrink-0"
+              title="Next Month"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Month Filter Pills */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-2 scrollbar-none">
+          {availableMonths.map((mStr) => {
+            const isSelected = selectedMonth === mStr;
+            const isCurrent = mStr === currentMonth;
+
+            return (
               <button
                 key={mStr}
                 type="button"
                 onClick={() => setSelectedMonth(mStr)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border whitespace-nowrap ${
-                  selectedMonth === mStr
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all border whitespace-nowrap ${
+                  isSelected
                     ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700 dark:border-slate-600 shadow-sm'
+                    : isCurrent
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800'
                     : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
                 }`}
               >
-                {formatMonthDisplay(mStr)}
+                {formatMonthDisplay(mStr)} {isCurrent ? '★' : ''}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         {/* Per-Source & Per-Person Breakdown Cards */}
