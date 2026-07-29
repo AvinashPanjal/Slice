@@ -32,6 +32,32 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
 }) => {
   const supabase = createClient();
   const [borrowerType, setBorrowerType] = useState<'PERSON' | 'MYSELF'>('PERSON');
+  const [localSources, setLocalSources] = useState<LoanSource[]>(sources || []);
+  const [localPeople, setLocalPeople] = useState<Person[]>(people || []);
+
+  useEffect(() => {
+    if (sources && sources.length > 0) {
+      setLocalSources(sources);
+    } else if (isOpen) {
+      const fetchSources = async () => {
+        const { data } = await supabase.from('loan_sources').select('*').order('name');
+        if (data) setLocalSources(data);
+      };
+      fetchSources();
+    }
+  }, [sources, isOpen, supabase]);
+
+  useEffect(() => {
+    if (people && people.length > 0) {
+      setLocalPeople(people);
+    } else if (isOpen) {
+      const fetchPeople = async () => {
+        const { data } = await supabase.from('people').select('*').eq('is_archived', false).order('name');
+        if (data) setLocalPeople(data);
+      };
+      fetchPeople();
+    }
+  }, [people, isOpen, supabase]);
 
   const {
     register,
@@ -72,8 +98,8 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
       setBorrowerType(defaultPersonId ? 'PERSON' : 'PERSON');
       reset({
         borrower_type: 'PERSON',
-        person_id: defaultPersonId || (people[0]?.id ?? undefined),
-        loan_source_id: sources[0]?.id ?? undefined,
+        person_id: defaultPersonId || (people[0]?.id ?? localPeople[0]?.id ?? undefined),
+        loan_source_id: sources[0]?.id ?? localSources[0]?.id ?? undefined,
         original_amount: 5000,
         default_due_amount: 481.60,
         repayment_type: 'FIXED_EMI',
@@ -82,7 +108,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
         installment_count: 12,
       });
     }
-  }, [loan, defaultPersonId, people, sources, reset, isOpen]);
+  }, [loan, defaultPersonId, people, sources, localPeople, localSources, reset, isOpen]);
 
   const handleBorrowerTypeChange = (type: 'PERSON' | 'MYSELF') => {
     setBorrowerType(type);
@@ -176,10 +202,10 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
       title={loan ? 'Edit Loan Record' : 'Record New Loan'}
       maxWidth="lg"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 sm:space-y-4">
         {/* Borrower Type Selector */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+          <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
             Who is borrowing this money? *
           </label>
           <div className="flex w-full gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
@@ -210,14 +236,14 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
 
         {borrowerType === 'PERSON' && (
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+            <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
               Select Person *
             </label>
             <select
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
+              className="w-full max-w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white truncate font-medium"
               {...register('person_id')}
             >
-              {people.map((p) => (
+              {localPeople.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} ({p.phone})
                 </option>
@@ -227,15 +253,15 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
         )}
 
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
+          <label className="block text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">
             Loan Source App *
           </label>
           <select
-            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
+            className="w-full max-w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white truncate font-medium"
             {...register('loan_source_id')}
           >
             <option value="">None / Custom</option>
-            {sources.map((s) => (
+            {localSources.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>

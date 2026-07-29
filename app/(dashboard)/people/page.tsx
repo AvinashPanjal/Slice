@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
-import { Person, Loan, MonthlyDue, PaymentAllocation, Adjustment, PersonFinancialSummary, ReminderTemplate } from '@/lib/types';
+import { Person, Loan, MonthlyDue, PaymentAllocation, Adjustment, PersonFinancialSummary, ReminderTemplate, LoanSource } from '@/lib/types';
 import { aggregatePersonSummary } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
 import { getCurrentMonthStr, getTodayStr } from '@/lib/utils/date';
@@ -40,6 +40,7 @@ export default function PeoplePage() {
   const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
+  const [sources, setSources] = useState<LoanSource[]>([]);
 
   // Search, Filter & Sort State
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,6 +64,7 @@ export default function PeoplePage() {
         { data: a },
         { data: adj },
         { data: t },
+        { data: s },
       ] = await Promise.all([
         supabase.from('people').select('*').eq('is_archived', false).order('name'),
         supabase.from('loans').select('*'),
@@ -70,6 +72,7 @@ export default function PeoplePage() {
         supabase.from('payment_allocations').select('*'),
         supabase.from('adjustments').select('*'),
         supabase.from('reminder_templates').select('*'),
+        supabase.from('loan_sources').select('*').order('name'),
       ]);
 
       if (p) setPeople(p);
@@ -78,6 +81,7 @@ export default function PeoplePage() {
       if (a) setAllocations(a);
       if (adj) setAdjustments(adj);
       if (t) setTemplates(t);
+      if (s) setSources(s);
     } catch (err) {
       console.error(err);
     } finally {
@@ -324,7 +328,7 @@ export default function PeoplePage() {
           onClose={() => setAddLoanPersonId(null)}
           defaultPersonId={addLoanPersonId}
           people={people}
-          sources={[]}
+          sources={sources}
           onSuccess={fetchPeopleData}
         />
       )}
