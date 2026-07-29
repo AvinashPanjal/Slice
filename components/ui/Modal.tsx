@@ -41,7 +41,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (maxWidth === '2xl') widthClasses = 'max-w-2xl';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
@@ -50,10 +50,10 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${widthClasses} bg-white dark:bg-[#131b2e] rounded-3xl p-4 sm:p-6 shadow-2xl border border-slate-100 dark:border-slate-800 z-10 my-auto max-h-[92vh] flex flex-col`}
+        className={`relative w-full ${widthClasses} bg-white dark:bg-[#131b2e] rounded-3xl p-4 sm:p-6 shadow-2xl border border-slate-100 dark:border-slate-800 z-10 my-auto mb-16 sm:mb-auto max-h-[85vh] sm:max-h-[92vh] flex flex-col`}
       >
-        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-4 shrink-0">
-          <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white pr-4">{title}</h3>
+        <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-3 sm:mb-4 shrink-0">
+          <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white pr-4">{title}</h3>
           <button
             onClick={onClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

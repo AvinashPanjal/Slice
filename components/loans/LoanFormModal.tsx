@@ -298,7 +298,7 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="sticky bottom-0 z-10 bg-white dark:bg-[#131b2e] flex items-center justify-between pt-3 pb-1 mt-4 border-t border-slate-100 dark:border-slate-800">
           {loan ? (
             <Button
               type="button"
