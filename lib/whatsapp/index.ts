@@ -13,21 +13,26 @@ interface ReminderParams {
   template?: string;
 }
 
-const DEFAULT_TEMPLATE = `Hi {name} 👋
+const DEFAULT_TEMPLATE = `Hi *{name}* 👋
 
-Payment reminder for {month}.
-Total due: {due_amount}
-Paid: {paid_amount}
-Remaining: {remaining_amount}
+This is a friendly payment reminder for *{month}*.
 
-Please make the remaining payment when possible.
-Thank you.`;
+📋 *Payment Details:*
+• Scheduled EMI Due: *{due_amount}*
+• Amount Settled: *{paid_amount}*
+• Pending Balance: *{remaining_amount}*
+• Due Date: *{due_date}*
+
+Kindly clear the remaining payment of *{remaining_amount}* when possible.
+
+Thank you! 🙏`;
 
 /**
  * Replaces placeholders in reminder template with actual values
  */
 export function buildReminderMessage(params: ReminderParams): string {
-  const tpl = params.template || DEFAULT_TEMPLATE;
+  const rawTpl = params.template || DEFAULT_TEMPLATE;
+  const tpl = rawTpl.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
 
   return tpl
     .replace(/{name}/g, params.name)
@@ -39,7 +44,7 @@ export function buildReminderMessage(params: ReminderParams): string {
 }
 
 /**
- * Generates WhatsApp click-to-chat URL (wa.me)
+ * Generates WhatsApp click-to-chat URL (wa.me) with proper URL encoded multiline breaks (%0A)
  */
 export function generateWhatsAppLink(phone: string, countryCode: string = '+91', message: string): string {
   let cleanPhone = phone.replace(/\D/g, '');
@@ -49,6 +54,11 @@ export function generateWhatsAppLink(phone: string, countryCode: string = '+91',
     cleanPhone = `${cc}${cleanPhone}`;
   }
 
-  const encodedMsg = encodeURIComponent(message);
+  // Convert literal \n or \r\n characters into true linebreaks before URL encoding
+  const cleanMessage = message
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n');
+
+  const encodedMsg = encodeURIComponent(cleanMessage);
   return `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
 }
