@@ -5,13 +5,16 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
-import { LoanSource, Loan, PaymentAllocation, Adjustment } from '@/lib/types';
-import { calculateTotalBorrowed, calculateLoanRemaining } from '@/lib/calculations';
+import { LoanSource, Loan, PaymentAllocation, Adjustment, MonthlyDue, Person } from '@/lib/types';
+import { calculateTotalBorrowed, calculateLoanRemaining, calculateTotalPaid, calculateDueRemaining, calculateDuePaid } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
-import { Building2, Plus, Trash2, CreditCard } from 'lucide-react';
+import { formatDateDisplay, getCurrentMonthStr, getTodayStr, formatMonthDisplay, getDaysRemainingInfo } from '@/lib/utils/date';
+import { WhatsAppModal } from '@/components/people/WhatsAppModal';
+import { Building2, Plus, Trash2, CreditCard, Calendar, CheckCircle, MessageSquare, PlusCircle } from 'lucide-react';
 
 export default function LoanSourcesPage() {
   const supabase = createClient();
@@ -19,14 +22,29 @@ export default function LoanSourcesPage() {
 
   const [sources, setSources] = useState<LoanSource[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [dues, setDues] = useState<MonthlyDue[]>([]);
   const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
+
+  // Selected Month Filter for Breakdown
+  const currentMonth = getCurrentMonthStr();
+  const today = getTodayStr();
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026-08');
 
   // Modal State
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(false);
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [selectedPersonForWhatsApp, setSelectedPersonForWhatsApp] = useState<{
+    person: Person;
+    dueAmount: number;
+    paidAmount: number;
+    remainingAmount: number;
+    dueDate: string;
+  } | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -36,17 +54,23 @@ export default function LoanSourcesPage() {
         { data: l },
         { data: a },
         { data: adj },
+        { data: d },
+        { data: p },
       ] = await Promise.all([
         supabase.from('loan_sources').select('*').order('name'),
         supabase.from('loans').select('*'),
         supabase.from('payment_allocations').select('*'),
         supabase.from('adjustments').select('*'),
+        supabase.from('monthly_dues').select('*'),
+        supabase.from('people').select('*'),
       ]);
 
       if (s) setSources(s);
       if (l) setLoans(l);
       if (a) setAllocations(a);
       if (adj) setAdjustments(adj);
+      if (d) setDues(d);
+      if (p) setPeople(p);
     } catch (err) {
       console.error(err);
     } finally {
@@ -91,6 +115,31 @@ export default function LoanSourcesPage() {
     fetchData();
   };
 
+  const handleQuickMarkPaidSource = async (dueIds: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('monthly_dues')
+        .update({
+          status: 'PAID',
+          is_manually_adjusted: true,
+          adjustment_reason: 'Quick marked paid from Loan Sources page',
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', dueIds);
+
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || 'Error marking dues as paid');
+    }
+  };
+
+  // Get all unique due months present in data for month tabs
+  const availableMonths = Array.from(new Set(dues.map((d) => d.due_month))).sort();
+  if (!availableMonths.includes('2026-08')) availableMonths.push('2026-08');
+  if (!availableMonths.includes('2026-07')) availableMonths.push('2026-07');
+  availableMonths.sort();
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -101,7 +150,7 @@ export default function LoanSourcesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -117,7 +166,7 @@ export default function LoanSourcesPage() {
         </Button>
       </div>
 
-      {/* Sources Grid */}
+      {/* Sources Overview Cards */}
       {sources.length === 0 ? (
         <EmptyState
           icon={<Building2 className="w-6 h-6 text-slate-400" />}
@@ -130,9 +179,14 @@ export default function LoanSourcesPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sources.map((source) => {
             const sLoans = loans.filter((l) => l.loan_source_id === source.id);
-            const totalBorrowed = calculateTotalBorrowed(sLoans);
+            const sDues = dues.filter((d) => sLoans.some((l) => l.id === d.loan_id));
+            const sAllocations = allocations.filter((a) => sLoans.some((l) => l.id === a.loan_id));
+
+            const totalOriginalPrincipal = calculateTotalBorrowed(sLoans);
+            const totalScheduled = sDues.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
+            const totalPaid = calculateTotalPaid(sAllocations, sDues);
             const outstanding = sLoans.reduce(
-              (acc, l) => acc + calculateLoanRemaining(l, allocations, adjustments),
+              (acc, l) => acc + calculateLoanRemaining(l, allocations, adjustments, dues),
               0
             );
 
@@ -143,7 +197,7 @@ export default function LoanSourcesPage() {
                     <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                       {source.name}
                     </h3>
-                    {source.notes && <p className="text-xs text-slate-500 mt-0.5">{source.notes}</p>}
+                    <p className="text-xs text-slate-500 mt-0.5">{sLoans.length} active loan records</p>
                   </div>
                   <button
                     onClick={() => handleDeleteSource(source.id, source.name)}
@@ -153,14 +207,20 @@ export default function LoanSourcesPage() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-xs">
                   <div>
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Loans</p>
-                    <p className="font-bold text-slate-900 dark:text-white">{sLoans.length}</p>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Original Principal</p>
+                    <p className="font-bold text-slate-900 dark:text-white">{formatINR(totalOriginalPrincipal)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Total Borrowed</p>
-                    <p className="font-bold text-slate-900 dark:text-white">{formatINR(totalBorrowed)}</p>
+                    <p className="text-[10px] text-indigo-500 font-semibold uppercase">Total w/ Interest</p>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400">
+                      {formatINR(totalScheduled > 0 ? totalScheduled : totalOriginalPrincipal)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Total Paid</p>
+                    <p className="font-bold text-emerald-600">{formatINR(totalPaid)}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-400 font-semibold uppercase">Outstanding</p>
@@ -172,6 +232,216 @@ export default function LoanSourcesPage() {
           })}
         </div>
       )}
+
+      {/* Monthly Breakdown Per Person & Overall Section */}
+      <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center">
+              <Calendar className="w-5 h-5 mr-2 text-indigo-500" />
+              Monthly Due Breakdown (Per Person & Overall)
+            </h2>
+            <p className="text-xs text-slate-500">Monthly schedule breakdown per borrower for platform sources</p>
+          </div>
+
+          {/* Month Selector Tabs */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {availableMonths.map((mStr) => (
+              <button
+                key={mStr}
+                type="button"
+                onClick={() => setSelectedMonth(mStr)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border whitespace-nowrap ${
+                  selectedMonth === mStr
+                    ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700 dark:border-slate-600 shadow-sm'
+                    : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {formatMonthDisplay(mStr)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Per-Source & Per-Person Breakdown Cards */}
+        {sources.map((source) => {
+          const sLoans = loans.filter((l) => l.loan_source_id === source.id);
+          const sDuesMonth = dues.filter(
+            (d) => d.due_month === selectedMonth && sLoans.some((l) => l.id === d.loan_id)
+          );
+
+          // Group by Person for this source & month
+          const personGroupMap = new Map<string, {
+            personId: string | null;
+            person: Person | null;
+            totalDue: number;
+            paidAmount: number;
+            remainingAmount: number;
+            dueIds: string[];
+            duesCount: number;
+            status: string;
+            dueDate: string;
+          }>();
+
+          sDuesMonth.forEach((d) => {
+            const groupKey = d.person_id || 'MYSELF';
+            const personObj = d.person_id ? people.find((p) => p.id === d.person_id) || null : null;
+            const duePaid = calculateDuePaid(d, allocations);
+            const dueRem = calculateDueRemaining(d, allocations);
+
+            if (!personGroupMap.has(groupKey)) {
+              personGroupMap.set(groupKey, {
+                personId: d.person_id || null,
+                person: personObj,
+                totalDue: Number(d.current_amount) || 0,
+                paidAmount: duePaid,
+                remainingAmount: dueRem,
+                dueIds: [d.id],
+                duesCount: 1,
+                status: d.status,
+                dueDate: d.due_date,
+              });
+            } else {
+              const grp = personGroupMap.get(groupKey)!;
+              grp.totalDue += Number(d.current_amount) || 0;
+              grp.paidAmount += duePaid;
+              grp.remainingAmount += dueRem;
+              grp.dueIds.push(d.id);
+              grp.duesCount += 1;
+            }
+          });
+
+          const personBreakdownList = Array.from(personGroupMap.values());
+          const overallSourceMonthDue = sDuesMonth.reduce((acc, d) => acc + (Number(d.current_amount) || 0), 0);
+          const overallSourceMonthPaid = sDuesMonth.reduce((acc, d) => acc + calculateDuePaid(d, allocations), 0);
+          const overallSourceMonthPending = Math.max(overallSourceMonthDue - overallSourceMonthPaid, 0);
+
+          return (
+            <Card key={source.id} className="space-y-4 border-l-4 border-l-indigo-500">
+              {/* Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="font-black text-lg text-slate-900 dark:text-white">
+                    {source.name} — {formatMonthDisplay(selectedMonth)} Breakdown
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {personBreakdownList.length} borrower{personBreakdownList.length !== 1 ? 's' : ''} with scheduled dues in {formatMonthDisplay(selectedMonth)}
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-4 bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-2xl text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Overall Month Due</span>
+                    <span className="font-extrabold text-sm text-slate-900 dark:text-white">{formatINR(overallSourceMonthDue)}</span>
+                  </div>
+                  <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Month Paid</span>
+                    <span className="font-extrabold text-sm text-emerald-600">{formatINR(overallSourceMonthPaid)}</span>
+                  </div>
+                  <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Month Pending</span>
+                    <span className="font-extrabold text-sm text-rose-600">{formatINR(overallSourceMonthPending)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Borrower Rows */}
+              {personBreakdownList.length === 0 ? (
+                <p className="text-xs text-slate-400 py-2">No monthly dues scheduled for {source.name} in {formatMonthDisplay(selectedMonth)}.</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {personBreakdownList.map((grp) => {
+                    const remInfo = getDaysRemainingInfo(grp.dueDate, grp.remainingAmount <= 0);
+
+                    return (
+                      <div
+                        key={grp.personId || 'MYSELF'}
+                        className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                      >
+                        {/* Left: Borrower info */}
+                        <div className="flex items-center space-x-3">
+                          <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs">
+                            {grp.person ? grp.person.name.charAt(0).toUpperCase() : 'M'}
+                          </div>
+                          <div>
+                            <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                              {grp.person ? grp.person.name : 'Myself'}
+                            </h4>
+                            <p className="text-[11px] text-slate-500">
+                              {grp.person?.phone ? `+91 ${grp.person.phone}` : 'Personal Loan'} • {grp.duesCount} loan installment(s)
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Center: Financial breakdown for this month */}
+                        <div className="flex items-center space-x-5">
+                          <div>
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Due Date</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{formatDateDisplay(grp.dueDate)}</span>
+                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] ml-1 ${remInfo.badgeClass}`}>
+                              {remInfo.label}
+                            </span>
+                          </div>
+
+                          <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Monthly Total</span>
+                            <span className="font-extrabold text-slate-900 dark:text-white">{formatINR(grp.totalDue)}</span>
+                          </div>
+
+                          <div className="border-l border-slate-200 dark:border-slate-700 pl-4">
+                            <span className="text-[9px] uppercase font-bold text-slate-400 block">Pending</span>
+                            <span className={`font-black ${grp.remainingAmount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {formatINR(grp.remainingAmount)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center space-x-2">
+                          {grp.remainingAmount > 0 ? (
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 shadow-sm"
+                              onClick={() => handleQuickMarkPaidSource(grp.dueIds)}
+                            >
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                              Mark Paid
+                            </Button>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-500/10 text-emerald-600 border border-emerald-200 dark:border-emerald-900/40">
+                              ✓ Paid
+                            </span>
+                          )}
+
+                          {grp.person && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs text-emerald-600 border-emerald-200 dark:border-emerald-900/50"
+                              onClick={() =>
+                                setSelectedPersonForWhatsApp({
+                                  person: grp.person!,
+                                  dueAmount: grp.totalDue,
+                                  paidAmount: grp.paidAmount,
+                                  remainingAmount: grp.remainingAmount,
+                                  dueDate: grp.dueDate,
+                                })
+                              }
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 mr-1" />
+                              WhatsApp
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Modal */}
       <Modal
@@ -211,6 +481,19 @@ export default function LoanSourcesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* WhatsApp Modal */}
+      {selectedPersonForWhatsApp && (
+        <WhatsAppModal
+          isOpen={!!selectedPersonForWhatsApp}
+          onClose={() => setSelectedPersonForWhatsApp(null)}
+          person={selectedPersonForWhatsApp.person}
+          dueAmount={selectedPersonForWhatsApp.dueAmount}
+          paidAmount={selectedPersonForWhatsApp.paidAmount}
+          remainingAmount={selectedPersonForWhatsApp.remainingAmount}
+          dueDate={selectedPersonForWhatsApp.dueDate}
+        />
+      )}
     </div>
   );
 }
