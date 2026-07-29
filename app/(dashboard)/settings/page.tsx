@@ -20,6 +20,26 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [countryCode, setCountryCode] = useState('+91');
+  const [upiId, setUpiId] = useState('');
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUpi = localStorage.getItem('lendwise_upi_id') || '';
+      if (savedUpi) setUpiId(savedUpi);
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+      });
+
+      window.addEventListener('appinstalled', () => {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
+      });
+    }
+  }, []);
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -37,6 +57,12 @@ export default function SettingsPage() {
         setFullName(prof.full_name || '');
         setCurrency(prof.default_currency || 'INR');
         setCountryCode(prof.default_country_code || '+91');
+        if (prof.default_upi_id) {
+          setUpiId(prof.default_upi_id);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('lendwise_upi_id', prof.default_upi_id);
+          }
+        }
       }
       if (tpls) setTemplates(tpls);
     } catch (err) {
@@ -57,23 +83,41 @@ export default function SettingsPage() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lendwise_upi_id', upiId.trim());
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: fullName,
           default_currency: currency,
           default_country_code: countryCode,
+          default_upi_id: upiId.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', userData.user.id);
 
       if (error) throw error;
-      alert('Profile settings saved successfully!');
+      alert('Profile preferences & UPI settings saved successfully!');
     } catch (err: any) {
       alert(err.message || 'Error saving settings');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) {
+      alert('To add LendWise to your Home Screen: Tap your browser menu (⋮ or share icon) and select "Add to Home Screen" or "Install App".');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
   };
 
   const handleUpdateTemplate = async (templateId: string, text: string) => {
@@ -102,15 +146,33 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
           Application Preferences & Settings
         </h1>
-        <p className="text-xs text-slate-500">Configure profile, default currency, and WhatsApp reminder templates</p>
+        <p className="text-xs text-slate-500">Configure profile, default currency, UPI address, and PWA installation</p>
       </div>
+
+      {/* Add to Home Screen (PWA) Card */}
+      <Card className="p-6 space-y-4 border-l-4 border-l-indigo-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center">
+              📱 Install LendWise App (Add to Home Screen)
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Access LendWise like a native app directly from your mobile home screen or desktop.
+            </p>
+          </div>
+
+          <Button onClick={handleInstallPWA} variant="primary" className="shadow-md shrink-0">
+            {isInstalled ? '✓ App Installed' : '📲 Add to Home Screen'}
+          </Button>
+        </div>
+      </Card>
 
       {/* Profile Preferences */}
       <Card className="p-6 space-y-6">
         <div className="flex items-center space-x-2 pb-4 border-b border-slate-100 dark:border-slate-800">
           <SettingsIcon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
           <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-            User Profile & Defaults
+            User Profile & UPI Payment Defaults
           </h2>
         </div>
 
@@ -144,6 +206,14 @@ export default function SettingsPage() {
             />
           </div>
 
+          <Input
+            label="Default UPI VPA Address (For GPay / PhonePe / Paytm)"
+            placeholder="e.g. 9847812409@okicici or user@upi"
+            value={upiId}
+            onChange={(e) => setUpiId(e.target.value)}
+            helperText="Saved UPI ID will automatically generate upi://pay links in WhatsApp reminders"
+          />
+
           <div className="flex justify-end pt-2">
             <Button type="submit" isLoading={saving}>
               <Save className="w-4 h-4 mr-1.5" />
@@ -170,7 +240,7 @@ export default function SettingsPage() {
                   {tpl.name} ({tpl.type})
                 </label>
                 <span className="text-[10px] text-slate-400 font-mono">
-                  Placeholders: {'{name}'}, {'{month}'}, {'{due_amount}'}, {'{paid_amount}'}, {'{remaining_amount}'}, {'{due_date}'}
+                  Placeholders: {'{name}'}, {'{month}'}, {'{due_amount}'}, {'{paid_amount}'}, {'{remaining_amount}'}, {'{due_date}'}, {'{upi_link}'}
                 </span>
               </div>
               <textarea

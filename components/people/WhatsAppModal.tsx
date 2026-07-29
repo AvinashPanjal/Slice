@@ -30,9 +30,24 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   templates = [],
 }) => {
   const [selectedTemplateType, setSelectedTemplateType] = useState<'NORMAL' | 'UPCOMING' | 'OVERDUE' | 'PARTIAL'>('NORMAL');
+  const [upiId, setUpiId] = useState('');
   const [message, setMessage] = useState('');
 
   const currentMonth = getCurrentMonthStr();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedUpi = localStorage.getItem('lendwise_upi_id') || '';
+      setUpiId(savedUpi);
+    }
+  }, [isOpen]);
+
+  const handleUpiChange = (val: string) => {
+    setUpiId(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lendwise_upi_id', val);
+    }
+  };
 
   useEffect(() => {
     if (person) {
@@ -49,11 +64,12 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         remainingAmount,
         dueDate,
         template: customTpl,
+        upiId,
       });
 
       setMessage(built);
     }
-  }, [person, dueAmount, paidAmount, remainingAmount, dueDate, selectedTemplateType, templates, currentMonth, isOpen]);
+  }, [person, dueAmount, paidAmount, remainingAmount, dueDate, selectedTemplateType, templates, currentMonth, isOpen, upiId]);
 
   if (!person) return null;
 
@@ -71,26 +87,41 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
       maxWidth="md"
     >
       <div className="space-y-4">
-        {/* Template Selector */}
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
-            Select Reminder Tone / Template
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {(['NORMAL', 'UPCOMING', 'OVERDUE', 'PARTIAL'] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setSelectedTemplateType(type)}
-                className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all ${
-                  selectedTemplateType === type
-                    ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700'
-                    : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
-                }`}
-              >
-                {type.charAt(0) + type.slice(1).toLowerCase()}
-              </button>
-            ))}
+        {/* Template Selector & UPI Input */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              Select Reminder Tone
+            </label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['NORMAL', 'UPCOMING', 'OVERDUE', 'PARTIAL'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setSelectedTemplateType(type)}
+                  className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all truncate ${
+                    selectedTemplateType === type
+                      ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700'
+                      : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {type.charAt(0) + type.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              Your UPI VPA Address (For GPay / PhonePe Link)
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0b1c30] dark:bg-[#131b2e] dark:text-white"
+              placeholder="e.g. 9847812409@okicici or user@upi"
+              value={upiId}
+              onChange={(e) => handleUpiChange(e.target.value)}
+            />
           </div>
         </div>
 

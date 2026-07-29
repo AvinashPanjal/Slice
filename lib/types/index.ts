@@ -13,6 +13,7 @@ export interface Profile {
   full_name?: string | null;
   default_currency: string;
   default_country_code: string;
+  default_upi_id?: string | null;
   created_at: string;
   updated_at: string;
 }

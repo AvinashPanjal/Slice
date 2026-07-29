@@ -41,7 +41,26 @@ const ALL_MENU_NAV = [
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const supabase = createClient();
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+      });
+    }
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) {
+      alert('To add LendWise to your Home Screen: Tap your browser menu (⋮ or share icon) and select "Add to Home Screen" or "Install App".');
+      return;
+    }
+    deferredPrompt.prompt();
+    setDeferredPrompt(null);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -50,69 +69,76 @@ export const BottomNav: React.FC = () => {
 
   return (
     <>
-      {/* Slide-Up Mobile Full Navigation Drawer */}
+      {/* Mobile Drawer Overlay */}
       {isMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div
-            className="fixed inset-0"
-            onClick={() => setIsMenuOpen(false)}
-          />
-          <div className="relative z-10 w-full bg-white dark:bg-[#131b2e] rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3 shrink-0">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
-                  LW
-                </div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">All Menu Pages</h3>
-              </div>
-              <button
-                onClick={() => setIsMenuOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+        <div
+          className="md:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 transition-opacity"
+          onClick={() => setIsMenuOpen(false)}
+        />
+      )}
 
-            {/* Menu Items List */}
-            <div className="overflow-y-auto space-y-1.5 flex-1 pr-1 py-1">
-              {ALL_MENU_NAV.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setIsMenuOpen(false)}
-                    className={`flex items-center space-x-3.5 p-3 rounded-2xl transition-all ${
-                      isActive
-                        ? 'bg-[#0b1c30] text-white dark:bg-slate-700 shadow-md font-bold'
-                        : 'bg-slate-50/70 dark:bg-slate-800/40 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className={`p-2 rounded-xl ${isActive ? 'bg-white/20 text-white' : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300'}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-extrabold">{item.label}</p>
-                      <p className={`text-[11px] ${isActive ? 'text-slate-200' : 'text-slate-400'}`}>{item.desc}</p>
-                    </div>
-                  </Link>
-                );
-              })}
+      {/* Slide-Up Mobile More Drawer */}
+      {isMenuOpen && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#131b2e] rounded-t-3xl p-5 shadow-2xl border-t border-slate-200 dark:border-slate-800 max-h-[85vh] flex flex-col transition-all">
+          {/* Drawer Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">LendWise Menu</h3>
+              <p className="text-[11px] text-slate-500">Quick access to all features</p>
             </div>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className="p-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-            {/* Logout Footer */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2 shrink-0">
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-extrabold hover:bg-rose-100 transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Log Out</span>
-              </button>
-            </div>
+          {/* Navigation Links Grid */}
+          <div className="overflow-y-auto py-3 space-y-1.5">
+            {ALL_MENU_NAV.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center space-x-3 p-2.5 rounded-2xl transition-all ${
+                    isActive
+                      ? 'bg-[#0b1c30] text-white dark:bg-slate-700 shadow-md font-bold'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className={`p-2 rounded-xl ${isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-extrabold">{item.label}</p>
+                    <p className={`text-[10px] ${isActive ? 'text-slate-200' : 'text-slate-400'}`}>{item.desc}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Install PWA & Logout Footer */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2 shrink-0 space-y-2">
+            <button
+              onClick={handleInstallPWA}
+              className="w-full flex items-center justify-center space-x-2 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold hover:bg-indigo-100 transition-all border border-indigo-200/50"
+            >
+              <span>📱 Add to Home Screen</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center space-x-2 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-extrabold hover:bg-rose-100 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Log Out</span>
+            </button>
           </div>
         </div>
       )}

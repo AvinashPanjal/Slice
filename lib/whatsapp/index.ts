@@ -11,6 +11,7 @@ interface ReminderParams {
   remainingAmount: number;
   dueDate?: string;
   template?: string;
+  upiId?: string;
 }
 
 const DEFAULT_TEMPLATE = `Hi *{name}* 👋
@@ -23,9 +24,22 @@ This is a friendly payment reminder for *{month}*.
 • Pending Balance: *{remaining_amount}*
 • Due Date: *{due_date}*
 
-Kindly clear the remaining payment of *{remaining_amount}* when possible.
+{upi_link}
+
+Kindly clear the remaining payment when possible.
 
 Thank you!`;
+
+/**
+ * Generates dynamic UPI Deep Link (upi://pay) for Google Pay, PhonePe, Paytm, BHIM
+ */
+export function generateUPILink(upiId: string, payeeName: string, amount: number, note?: string): string {
+  const cleanUPI = upiId.trim();
+  if (!cleanUPI) return '';
+  const encodedName = encodeURIComponent(payeeName || 'LendWise');
+  const encodedNote = encodeURIComponent(note || 'EMI Payment');
+  return `upi://pay?pa=${cleanUPI}&pn=${encodedName}&am=${amount}&tn=${encodedNote}&cu=INR`;
+}
 
 /**
  * Replaces placeholders in reminder template with actual values
@@ -44,6 +58,18 @@ export function buildReminderMessage(params: ReminderParams): string {
     .replace(/₹\s*{due_amount}/g, '{due_amount}')
     .replace(/₹\s*{paid_amount}/g, '{paid_amount}')
     .replace(/₹\s*{remaining_amount}/g, '{remaining_amount}');
+
+  const upiUri = params.upiId
+    ? generateUPILink(params.upiId, 'LendWise', params.remainingAmount, `${formatMonthDisplay(params.month)} EMI`)
+    : '';
+
+  const upiText = upiUri ? `👉 *Pay via UPI (GPay/PhonePe/Paytm):*\n${upiUri}` : '';
+
+  if (tpl.includes('{upi_link}')) {
+    tpl = tpl.replace(/{upi_link}/g, upiText);
+  } else if (upiText) {
+    tpl = `${tpl}\n\n${upiText}`;
+  }
 
   return tpl
     .replace(/{name}/g, params.name)
