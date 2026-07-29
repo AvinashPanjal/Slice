@@ -54,7 +54,7 @@ interface PersonAttentionGroup {
   personId: string | null;
   person: Person | null;
   totalPending: number;
-  nextDueId: string;
+  dueIds: string[];
   earliestDueDate: string;
   duesCount: number;
   hasOverdue: boolean;
@@ -114,7 +114,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleQuickMarkPaid = async (dueId: string) => {
+  const handleQuickMarkPaid = async (dueIds: string[]) => {
     try {
       const { error } = await supabase
         .from('monthly_dues')
@@ -124,7 +124,7 @@ export default function DashboardPage() {
           adjustment_reason: 'Quick marked paid from Dashboard',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', dueId);
+        .in('id', dueIds);
 
       if (error) throw error;
       fetchDashboardData();
@@ -149,7 +149,7 @@ export default function DashboardPage() {
     today
   );
 
-  // Group pending/overdue dues by Person. Shows ONLY next month's due amount and excludes far-future months (> 35 days out)
+  // Group pending/overdue dues by Person. Sums ALL dues for that borrower on their next target due date
   const attentionGroupMap = new Map<string, PersonAttentionGroup>();
 
   const todayDate = new Date();
@@ -173,8 +173,8 @@ export default function DashboardPage() {
         groupKey,
         personId: d.person_id || null,
         person: personObj,
-        totalPending: remaining, // NEXT MONTH'S DUE AMOUNT ONLY
-        nextDueId: d.id,
+        totalPending: remaining,
+        dueIds: [d.id],
         earliestDueDate: d.due_date,
         duesCount: 1,
         hasOverdue: d.due_date < today,
@@ -184,9 +184,14 @@ export default function DashboardPage() {
       const grp = attentionGroupMap.get(groupKey)!;
       if (d.due_date < grp.earliestDueDate) {
         grp.earliestDueDate = d.due_date;
-        grp.totalPending = remaining; // Use earliest next upcoming due amount
-        grp.nextDueId = d.id;
+        grp.totalPending = remaining;
+        grp.dueIds = [d.id];
+        grp.duesCount = 1;
         grp.dueMonth = d.due_month;
+      } else if (d.due_date === grp.earliestDueDate) {
+        grp.totalPending += remaining;
+        grp.dueIds.push(d.id);
+        grp.duesCount += 1;
       }
       if (d.due_date < today) {
         grp.hasOverdue = true;
@@ -362,7 +367,7 @@ export default function DashboardPage() {
                     <Button
                       size="sm"
                       className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 shadow-sm shadow-emerald-500/20"
-                      onClick={() => handleQuickMarkPaid(grp.nextDueId)}
+                      onClick={() => handleQuickMarkPaid(grp.dueIds)}
                     >
                       <CheckCircle className="w-3.5 h-3.5 mr-1 text-white" />
                       Mark Paid
