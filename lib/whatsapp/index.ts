@@ -25,14 +25,25 @@ This is a friendly payment reminder for *{month}*.
 
 Kindly clear the remaining payment of *{remaining_amount}* when possible.
 
-Thank you! 🙏`;
+Thank you!`;
 
 /**
  * Replaces placeholders in reminder template with actual values
  */
 export function buildReminderMessage(params: ReminderParams): string {
   const rawTpl = params.template || DEFAULT_TEMPLATE;
-  const tpl = rawTpl.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
+  
+  // Clean literal %0A strings, \\n, and \r\n into true JavaScript line breaks
+  let tpl = rawTpl
+    .replace(/%0A/gi, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n');
+
+  // Strip duplicate ₹ prefix before placeholders if present in template
+  tpl = tpl
+    .replace(/₹\s*{due_amount}/g, '{due_amount}')
+    .replace(/₹\s*{paid_amount}/g, '{paid_amount}')
+    .replace(/₹\s*{remaining_amount}/g, '{remaining_amount}');
 
   return tpl
     .replace(/{name}/g, params.name)
@@ -54,8 +65,9 @@ export function generateWhatsAppLink(phone: string, countryCode: string = '+91',
     cleanPhone = `${cc}${cleanPhone}`;
   }
 
-  // Convert literal \n or \r\n characters into true linebreaks before URL encoding
+  // Convert literal %0A strings, \\n, and \r\n into true linebreaks before URL encoding
   const cleanMessage = message
+    .replace(/%0A/gi, '\n')
     .replace(/\\n/g, '\n')
     .replace(/\r\n/g, '\n');
 
