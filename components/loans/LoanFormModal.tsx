@@ -179,17 +179,17 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Borrower Type Selector */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
             Who is borrowing this money? *
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex w-full gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/60 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
             <button
               type="button"
               onClick={() => handleBorrowerTypeChange('PERSON')}
-              className={`py-2.5 px-4 rounded-xl text-sm font-semibold border transition-all ${
+              className={`flex-1 py-2 px-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all text-center truncate ${
                 borrowerType === 'PERSON'
-                  ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700'
-                  : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-[#0b1c30] text-white dark:bg-slate-700 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
               Friend / Person
@@ -197,10 +197,10 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
             <button
               type="button"
               onClick={() => handleBorrowerTypeChange('MYSELF')}
-              className={`py-2.5 px-4 rounded-xl text-sm font-semibold border transition-all ${
+              className={`flex-1 py-2 px-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all text-center truncate ${
                 borrowerType === 'MYSELF'
-                  ? 'bg-[#0b1c30] text-white border-[#0b1c30] dark:bg-slate-700'
-                  : 'bg-white dark:bg-[#131b2e] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-[#0b1c30] text-white dark:bg-slate-700 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
               Myself
@@ -298,11 +298,13 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
           />
         </div>
 
-        <div className="sticky bottom-0 z-10 bg-white dark:bg-[#131b2e] flex items-center justify-between pt-3 pb-1 mt-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="sticky bottom-0 z-20 bg-white dark:bg-[#131b2e] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 pt-3 pb-2 mt-4 border-t border-slate-100 dark:border-slate-800">
           {loan ? (
             <Button
               type="button"
               variant="danger"
+              size="sm"
+              className="text-xs"
               onClick={async () => {
                 if (
                   !confirm(
@@ -329,11 +331,11 @@ export const LoanFormModal: React.FC<LoanFormModalProps> = ({
           ) : (
             <div />
           )}
-          <div className="flex items-center space-x-3">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+            <Button type="button" variant="outline" size="sm" className="text-xs px-3" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={isSubmitting}>
+            <Button type="submit" size="sm" className="text-xs px-4" isLoading={isSubmitting}>
               {loan ? 'Save Changes' : 'Create Loan'}
             </Button>
           </div>
