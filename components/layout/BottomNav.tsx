@@ -62,6 +62,29 @@ export const BottomNav: React.FC = () => {
     setDeferredPrompt(null);
   };
 
+  const toggleFullscreen = () => {
+    setIsMenuOpen(false);
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      const elem = document.documentElement as any;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+      }
+    } else {
+      const doc = document as any;
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
@@ -123,8 +146,15 @@ export const BottomNav: React.FC = () => {
             })}
           </div>
 
-          {/* Install PWA & Logout Footer */}
+          {/* Install PWA, Fullscreen & Logout Footer */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2 shrink-0 space-y-2">
+            <button
+              onClick={toggleFullscreen}
+              className="w-full flex items-center justify-center space-x-2 py-2 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold hover:bg-indigo-700 transition-all shadow-md"
+            >
+              <span>📺 Toggle True Fullscreen Mode</span>
+            </button>
+
             <button
               onClick={handleInstallPWA}
               className="w-full flex items-center justify-center space-x-2 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 text-xs font-extrabold hover:bg-indigo-100 transition-all border border-indigo-200/50"

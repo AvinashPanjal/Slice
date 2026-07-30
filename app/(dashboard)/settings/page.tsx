@@ -126,6 +126,28 @@ export default function SettingsPage() {
     }
   };
 
+  const handleToggleFullscreen = () => {
+    if (!document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+      const elem = document.documentElement as any;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+      }
+    } else {
+      const doc = document as any;
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+    }
+  };
+
   const handleInstallPWA = async () => {
     if (!deferredPrompt) {
       alert('To add LendWise to your Home Screen: Tap your browser menu (⋮ or share icon) and select "Add to Home Screen" or "Install App".');
@@ -168,15 +190,31 @@ export default function SettingsPage() {
         <p className="text-xs text-slate-500">Configure profile, default currency, UPI address, and PWA installation</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Fullscreen API Card */}
+        <Card className="p-5 space-y-3 border-l-4 border-l-purple-500">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center">
+              📺 Native Fullscreen
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Instantly expands to 100% full-screen hiding all browser address bars and Chrome UI.
+            </p>
+          </div>
+
+          <Button onClick={handleToggleFullscreen} size="sm" className="shadow-md w-full bg-purple-600 hover:bg-purple-700 text-white">
+            📺 Enter Fullscreen
+          </Button>
+        </Card>
+
         {/* Add to Home Screen (PWA) Card */}
         <Card className="p-5 space-y-3 border-l-4 border-l-indigo-500">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center">
-              📱 Install App (Add to Home Screen)
+              📱 Install App (Home Screen)
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Runs full-screen as a native mobile app without the browser address bar.
+              Runs as a standalone mobile app launcher icon.
             </p>
           </div>
 
@@ -189,7 +227,7 @@ export default function SettingsPage() {
         <Card className="p-5 space-y-3 border-l-4 border-l-emerald-500">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center">
-              🔔 Mobile & Desktop Push Notifications
+              🔔 Mobile Notifications
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               Get automatic OS push alerts for upcoming 5th EMI due dates & pending dues.
@@ -197,7 +235,7 @@ export default function SettingsPage() {
           </div>
 
           <Button onClick={handleToggleNotifications} variant={notifGranted ? 'outline' : 'primary'} size="sm" className="shadow-md w-full">
-            {notifGranted ? '✓ Notifications Active' : '🔔 Enable Notifications'}
+            {notifGranted ? '✓ Active' : '🔔 Enable Notifications'}
           </Button>
         </Card>
       </div>
