@@ -2,34 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-function crc32(buf) {
-  let c = ~0;
-  for (let i = 0; i < buf.length; i++) {
-    c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ ~0) >>> 0;
-}
-
-const crcTable = new Uint32Array(256);
-for (let n = 0; n < 256; n++) {
-  let c = n;
-  for (let k = 0; k < 8; k++) {
-    c = c & 1 ? 0xedb88320 ^ (c >>> 8) : c >>> 8;
-  }
-  crcTable[n] = c;
-}
-
-function makeChunk(type, data) {
-  const length = data.length;
-  const chunk = Buffer.alloc(4 + 4 + length + 4);
-  chunk.writeUInt32BE(length, 0);
-  chunk.write(type, 4);
-  data.copy(chunk, 8);
-  const crc = crc32(chunk.slice(4, 8 + length));
-  chunk.writeUInt32BE(crc, 8 + length);
-  return chunk;
-}
-
 function makePNG(width, height, r, g, b) {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -74,6 +46,34 @@ function makePNG(width, height, r, g, b) {
   return Buffer.concat([signature, ihdrChunk, idatChunk, iendChunk]);
 }
 
+function makeChunk(type, data) {
+  const length = data.length;
+  const chunk = Buffer.alloc(4 + 4 + length + 4);
+  chunk.writeUInt32BE(length, 0);
+  chunk.write(type, 4);
+  data.copy(chunk, 8);
+  const crc = crc32(chunk.slice(4, 8 + length));
+  chunk.writeInt32BE(crc, 8 + length);
+  return chunk;
+}
+
+function crc32(buf) {
+  let c = ~0;
+  for (let i = 0; i < buf.length; i++) {
+    c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return ~c;
+}
+
+const crcTable = new Int32Array(256);
+for (let n = 0; n < 256; n++) {
+  let c = n;
+  for (let k = 0; k < 8; k++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 8) : c >>> 8;
+  }
+  crcTable[n] = c;
+}
+
 const iconsDir = path.join(__dirname, '..', 'public', 'icons');
 if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
@@ -87,8 +87,4 @@ fs.writeFileSync(path.join(iconsDir, 'apple-touch-icon.png'), makePNG(192, 192, 
 fs.writeFileSync(path.join(iconsDir, 'screenshot-wide.png'), makePNG(1280, 720, 11, 28, 48));
 fs.writeFileSync(path.join(iconsDir, 'screenshot-mobile.png'), makePNG(750, 1334, 11, 28, 48));
 
-// Also copy to public/ root for fallback references
-fs.copyFileSync(path.join(iconsDir, 'icon-192.png'), path.join(__dirname, '..', 'public', 'icon-192.png'));
-fs.copyFileSync(path.join(iconsDir, 'icon-512.png'), path.join(__dirname, '..', 'public', 'icon-512.png'));
-
-console.log('Successfully regenerated 100% valid PNG files with correct uint32BE CRC checksums!');
+console.log('Successfully generated full PWA icon suite & screenshots in public/icons/');
