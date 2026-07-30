@@ -16,7 +16,7 @@ function makePNG(width, height, r, g, b) {
   ihdrData[12] = 0; // Interlace
   const ihdrChunk = makeChunk('IHDR', ihdrData);
 
-  // IDAT chunk (raw RGB image rows with filter byte 0)
+  // IDAT chunk
   const rowSize = 1 + width * 3;
   const rawData = Buffer.alloc(height * rowSize);
 
@@ -25,9 +25,8 @@ function makePNG(width, height, r, g, b) {
     rawData[rowOffset] = 0; // None filter
     for (let x = 0; x < width; x++) {
       const pixelOffset = rowOffset + 1 + x * 3;
-      // Draw dark background (#0b1c30) with inner indigo square (#6366f1)
       const isInnerSquare =
-        x > width * 0.2 && x < width * 0.8 && y > height * 0.2 && y < height * 0.8;
+        x > width * 0.25 && x < width * 0.75 && y > height * 0.25 && y < height * 0.75;
       if (isInnerSquare) {
         rawData[pixelOffset] = 99;   // R
         rawData[pixelOffset + 1] = 102; // G
@@ -42,8 +41,6 @@ function makePNG(width, height, r, g, b) {
 
   const compressedData = zlib.deflateSync(rawData);
   const idatChunk = makeChunk('IDAT', compressedData);
-
-  // IEND chunk
   const iendChunk = makeChunk('IEND', Buffer.alloc(0));
 
   return Buffer.concat([signature, ihdrChunk, idatChunk, iendChunk]);
@@ -82,12 +79,12 @@ if (!fs.existsSync(iconsDir)) {
   fs.mkdirSync(iconsDir, { recursive: true });
 }
 
-// Write 192x192, 512x512, and apple-touch-icon PNG files
-const png192 = makePNG(192, 192, 11, 28, 48); // #0b1c30
-const png512 = makePNG(512, 512, 11, 28, 48); // #0b1c30
+fs.writeFileSync(path.join(iconsDir, 'icon-96.png'), makePNG(96, 96, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'icon-144.png'), makePNG(144, 144, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'icon-192.png'), makePNG(192, 192, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'icon-512.png'), makePNG(512, 512, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'apple-touch-icon.png'), makePNG(192, 192, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'screenshot-wide.png'), makePNG(1280, 720, 11, 28, 48));
+fs.writeFileSync(path.join(iconsDir, 'screenshot-mobile.png'), makePNG(750, 1334, 11, 28, 48));
 
-fs.writeFileSync(path.join(iconsDir, 'icon-192.png'), png192);
-fs.writeFileSync(path.join(iconsDir, 'icon-512.png'), png512);
-fs.writeFileSync(path.join(iconsDir, 'apple-touch-icon.png'), png192);
-
-console.log('Successfully generated PWA icon files: icon-192.png, icon-512.png, apple-touch-icon.png');
+console.log('Successfully generated full PWA icon suite & screenshots in public/icons/');
