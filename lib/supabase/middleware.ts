@@ -48,8 +48,17 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/forgot-password') ||
     request.nextUrl.pathname.startsWith('/reset-password');
 
+  const isPublicAsset =
+    request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname.startsWith('/manifest') ||
+    request.nextUrl.pathname.startsWith('/sw.js') ||
+    request.nextUrl.pathname.startsWith('/icons/') ||
+    request.nextUrl.pathname.endsWith('.png') ||
+    request.nextUrl.pathname.endsWith('.json') ||
+    request.nextUrl.pathname.endsWith('.js');
+
   // If user is not authenticated and trying to access protected routes
-  if (!user && !isAuthRoute && request.nextUrl.pathname !== '/') {
+  if (!user && !isAuthRoute && !isPublicAsset) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
