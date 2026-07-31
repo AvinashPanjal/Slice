@@ -21,3 +21,9 @@ Thumbs.db
 # Build
 build/
 dist/
+
+# Android Capacitor
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/

@@ -1,0 +1,18 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.lendwise.app',
+  appName: 'LendWise',
+  webDir: 'public',
+  server: {
+    url: 'https://slice-blush-ten.vercel.app',
+    cleartext: true,
+  },
+  android: {
+    allowMixedContent: true,
+    captureInput: true,
+    backgroundColor: '#0b1c30',
+  },
+};
+
+export default config;

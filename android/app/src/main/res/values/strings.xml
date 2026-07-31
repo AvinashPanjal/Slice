@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LendWise</string>
+    <string name="title_activity_main">LendWise</string>
+    <string name="package_name">com.lendwise.app</string>
+    <string name="custom_url_scheme">com.lendwise.app</string>
+</resources>
