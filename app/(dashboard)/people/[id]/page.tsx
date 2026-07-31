@@ -141,7 +141,7 @@ export default function PersonDetailPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
       {/* Back Button */}
       <button
         onClick={() => router.push('/people')}
@@ -152,85 +152,85 @@ export default function PersonDetailPage() {
       </button>
 
       {/* Person Header Card */}
-      <Card className="p-6 bg-white dark:bg-[#131b2e] border border-slate-200/80 dark:border-slate-800">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#0b1c30] text-white flex items-center justify-center font-bold text-xl shadow-md">
+      <Card className="p-4 sm:p-6 bg-white dark:bg-[#131b2e] border border-slate-200/80 dark:border-slate-800 w-full max-w-full overflow-hidden box-border">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 w-full">
+          <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#0b1c30] text-white flex items-center justify-center font-bold text-lg sm:text-xl shadow-md shrink-0">
               {person.name.charAt(0)}
             </div>
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-2xl font-black text-slate-900 dark:text-white">{person.name}</h1>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate max-w-full">{person.name}</h1>
                 <Badge status={summary.status} />
               </div>
-              <p className="text-xs text-slate-500 flex items-center mt-1">
-                <Phone className="w-3.5 h-3.5 mr-1" /> +91 {person.phone}
-                {person.email && <span className="ml-3">• {person.email}</span>}
+              <p className="text-xs text-slate-500 flex flex-wrap items-center mt-1 truncate">
+                <Phone className="w-3.5 h-3.5 mr-1 shrink-0" /> +91 {person.phone}
+                {person.email && <span className="ml-2 truncate">• {person.email}</span>}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setIsEditPersonOpen(true)}>
-              <Edit className="w-3.5 h-3.5 mr-1" />
-              Edit
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
+            <Button size="sm" variant="outline" onClick={() => setIsEditPersonOpen(true)} className="w-full sm:w-auto text-xs px-2.5 py-1.5">
+              <Edit className="w-3.5 h-3.5 mr-1 shrink-0" />
+              <span>Edit</span>
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setIsWhatsAppOpen(true)}>
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mr-1" />
-              WhatsApp
+            <Button size="sm" variant="outline" onClick={() => setIsWhatsAppOpen(true)} className="w-full sm:w-auto text-xs px-2.5 py-1.5">
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600 mr-1 shrink-0" />
+              <span>WhatsApp</span>
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setIsAddLoanOpen(true)}>
-              <PlusCircle className="w-3.5 h-3.5 text-indigo-500 mr-1" />
-              Add Loan
+            <Button size="sm" variant="outline" onClick={() => setIsAddLoanOpen(true)} className="w-full sm:w-auto text-xs px-2.5 py-1.5">
+              <PlusCircle className="w-3.5 h-3.5 text-indigo-500 mr-1 shrink-0" />
+              <span>Add Loan</span>
             </Button>
-            <Button size="sm" variant="success" onClick={() => setIsAddPaymentOpen(true)}>
-              <Receipt className="w-3.5 h-3.5 mr-1" />
-              Add Payment
+            <Button size="sm" variant="success" onClick={() => setIsAddPaymentOpen(true)} className="w-full sm:w-auto text-xs px-2.5 py-1.5 col-span-2 sm:col-auto">
+              <Receipt className="w-3.5 h-3.5 mr-1 shrink-0" />
+              <span>Add Payment</span>
             </Button>
           </div>
         </div>
 
         {/* Aggregated Financial Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-xs">
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Total Borrowed</p>
-            <p className="font-extrabold text-base text-slate-900 dark:text-white mt-0.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mt-5 pt-5 border-t border-slate-100 dark:border-slate-800 text-xs w-full max-w-full box-border">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Total Borrowed</p>
+            <p className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white mt-0.5 truncate">
               {formatINR(summary.total_borrowed)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Total Paid</p>
-            <p className="font-extrabold text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Total Paid</p>
+            <p className="font-extrabold text-sm sm:text-base text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
               {formatINR(summary.total_paid)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Outstanding</p>
-            <p className="font-extrabold text-base text-amber-600 dark:text-amber-400 mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Outstanding</p>
+            <p className="font-extrabold text-sm sm:text-base text-amber-600 dark:text-amber-400 mt-0.5 truncate">
               {formatINR(summary.outstanding)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Current Month Due</p>
-            <p className="font-extrabold text-base text-slate-900 dark:text-white mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Current Month Due</p>
+            <p className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white mt-0.5 truncate">
               {formatINR(summary.current_month_due)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Month Paid</p>
-            <p className="font-extrabold text-base text-emerald-600 mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Month Paid</p>
+            <p className="font-extrabold text-sm sm:text-base text-emerald-600 mt-0.5 truncate">
               {formatINR(summary.current_month_paid)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Month Pending</p>
-            <p className="font-extrabold text-base text-rose-600 mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Month Pending</p>
+            <p className="font-extrabold text-sm sm:text-base text-rose-600 mt-0.5 truncate">
               {formatINR(summary.current_month_pending)}
             </p>
           </div>
-          <div>
-            <p className="text-slate-400 font-semibold uppercase text-[10px]">Overdue</p>
-            <p className="font-extrabold text-base text-rose-600 mt-0.5">
+          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 col-span-2 sm:col-span-1">
+            <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Overdue</p>
+            <p className="font-extrabold text-sm sm:text-base text-rose-600 mt-0.5 truncate">
               {formatINR(summary.overdue_amount)}
             </p>
           </div>

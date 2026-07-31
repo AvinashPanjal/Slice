@@ -31,14 +31,16 @@ Kindly clear the remaining payment when possible.
 Thank you!`;
 
 /**
- * Generates dynamic UPI Deep Link (upi://pay) for Google Pay, PhonePe, Paytm, BHIM
+ * Generates dynamic UPI Deep Link (upi://pay) formatted strictly for NPCI & WhatsApp compliance
  */
 export function generateUPILink(upiId: string, payeeName: string, amount: number, note?: string): string {
   const cleanUPI = upiId.trim();
   if (!cleanUPI) return '';
-  const encodedName = encodeURIComponent(payeeName || 'LendWise');
-  const encodedNote = encodeURIComponent(note || 'EMI Payment');
-  return `upi://pay?pa=${cleanUPI}&pn=${encodedName}&am=${amount}&tn=${encodedNote}&cu=INR`;
+  const cleanAmount = (Math.max(0, amount) || 0).toFixed(2);
+  const cleanName = encodeURIComponent((payeeName || 'LendWise').replace(/[^a-zA-Z0-9 ]/g, '').trim());
+  const cleanNote = encodeURIComponent((note || 'EMIPayment').replace(/[^a-zA-Z0-9]/g, '').slice(0, 30));
+  const tr = `LW${Date.now()}`;
+  return `upi://pay?pa=${cleanUPI}&pn=${cleanName}&am=${cleanAmount}&cu=INR&tn=${cleanNote}&tr=${tr}`;
 }
 
 export const DEFAULT_UPI_ID = 'avinashpanjal5@okhdfcbank';
@@ -64,10 +66,12 @@ export function buildReminderMessage(params: ReminderParams): string {
   const effectiveUpi = params.upiId || DEFAULT_UPI_ID;
 
   const upiUri = effectiveUpi
-    ? generateUPILink(effectiveUpi, 'LendWise', params.remainingAmount, `${formatMonthDisplay(params.month)} EMI`)
+    ? generateUPILink(effectiveUpi, 'LendWise', params.remainingAmount, 'EMIPayment')
     : '';
 
-  const upiText = upiUri ? `👉 *Pay via UPI (GPay/PhonePe/Paytm):*\n${upiUri}` : '';
+  const upiText = effectiveUpi
+    ? `👉 *Pay via UPI App (GPay/PhonePe/Paytm):*\n${upiUri}\n\n💳 *UPI ID:* \`${effectiveUpi}\``
+    : '';
 
   if (tpl.includes('{upi_link}')) {
     tpl = tpl.replace(/{upi_link}/g, upiText);

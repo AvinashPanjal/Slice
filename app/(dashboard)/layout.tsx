@@ -50,17 +50,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f8f9ff] dark:bg-[#0b1c30]">
+    <div className="flex min-h-screen bg-[#f8f9ff] dark:bg-[#0b1c30] w-full max-w-full overflow-x-hidden">
       {/* Desktop Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-6">
+      <div className="flex-1 flex flex-col min-w-0 pb-20 md:pb-6 w-full max-w-full overflow-x-hidden">
         <Header
           title="LendWise"
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
         />
-        <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 box-border">
           {children}
         </main>
       </div>
