@@ -50,6 +50,7 @@ export async function updateSession(request: NextRequest) {
 
   const isPublicAsset =
     request.nextUrl.pathname === '/' ||
+    request.nextUrl.pathname.startsWith('/pay') ||
     request.nextUrl.pathname.startsWith('/manifest') ||
     request.nextUrl.pathname.startsWith('/sw.js') ||
     request.nextUrl.pathname.startsWith('/icons/') ||

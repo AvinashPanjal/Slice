@@ -65,12 +65,12 @@ export function buildReminderMessage(params: ReminderParams): string {
 
   const effectiveUpi = params.upiId || DEFAULT_UPI_ID;
 
-  const upiUri = effectiveUpi
-    ? generateUPILink(effectiveUpi, 'LendWise', params.remainingAmount, 'EMIPayment')
+  const payWebUrl = effectiveUpi
+    ? `https://slice-blush-ten.vercel.app/pay?pa=${encodeURIComponent(effectiveUpi)}&am=${(Math.max(0, params.remainingAmount) || 0).toFixed(2)}&pn=LendWise&tn=EMIPayment`
     : '';
 
-  const upiText = effectiveUpi
-    ? `👉 *Pay via UPI App (GPay/PhonePe/Paytm):*\n${upiUri}\n\n💳 *UPI ID:* \`${effectiveUpi}\``
+  const upiText = payWebUrl
+    ? `👉 *Pay Online via UPI (Google Pay / PhonePe / Paytm):*\n${payWebUrl}\n\n💳 *UPI ID:* \`${effectiveUpi}\``
     : '';
 
   if (tpl.includes('{upi_link}')) {
