@@ -37,10 +37,8 @@ export function generateUPILink(upiId: string, payeeName: string, amount: number
   const cleanUPI = upiId.trim();
   if (!cleanUPI) return '';
   const cleanAmount = (Math.max(0, amount) || 0).toFixed(2);
-  const cleanName = encodeURIComponent((payeeName || 'LendWise').replace(/[^a-zA-Z0-9 ]/g, '').trim());
-  const cleanNote = encodeURIComponent((note || 'EMIPayment').replace(/[^a-zA-Z0-9]/g, '').slice(0, 30));
-  const tr = `LW${Date.now()}`;
-  return `upi://pay?pa=${cleanUPI}&pn=${cleanName}&am=${cleanAmount}&cu=INR&tn=${cleanNote}&tr=${tr}`;
+  const cleanName = encodeURIComponent((payeeName || 'Avinash').replace(/[^a-zA-Z0-9 ]/g, '').trim());
+  return `upi://pay?pa=${cleanUPI}&pn=${cleanName}&am=${cleanAmount}&cu=INR`;
 }
 
 export const DEFAULT_UPI_ID = 'avinashpanjal5@okhdfcbank';
