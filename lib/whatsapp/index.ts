@@ -24,7 +24,7 @@ This is a friendly payment reminder for *{month}*.
 • Pending Balance: *{remaining_amount}*
 • Due Date: *{due_date}*
 
-{upi_link}
+💳 *UPI ID:* \`{upi_id}\`
 
 Kindly clear the remaining payment when possible.
 
@@ -63,15 +63,11 @@ export function buildReminderMessage(params: ReminderParams): string {
 
   const effectiveUpi = params.upiId || DEFAULT_UPI_ID;
 
-  const payWebUrl = effectiveUpi
-    ? `https://slice-blush-ten.vercel.app/pay?pa=${encodeURIComponent(effectiveUpi)}&am=${(Math.max(0, params.remainingAmount) || 0).toFixed(2)}&pn=LendWise&tn=EMIPayment`
-    : '';
+  const upiText = effectiveUpi ? `💳 *UPI ID:* \`${effectiveUpi}\`` : '';
 
-  const upiText = payWebUrl
-    ? `👉 *Pay Online via UPI (Google Pay / PhonePe / Paytm):*\n${payWebUrl}\n\n💳 *UPI ID:* \`${effectiveUpi}\``
-    : '';
-
-  if (tpl.includes('{upi_link}')) {
+  if (tpl.includes('{upi_id}')) {
+    tpl = tpl.replace(/{upi_id}/g, `\`${effectiveUpi}\``);
+  } else if (tpl.includes('{upi_link}')) {
     tpl = tpl.replace(/{upi_link}/g, upiText);
   } else if (upiText) {
     tpl = `${tpl}\n\n${upiText}`;
