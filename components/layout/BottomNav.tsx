@@ -102,7 +102,7 @@ export const BottomNav: React.FC = () => {
 
       {/* Slide-Up Mobile More Drawer */}
       {isMenuOpen && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 liquid-glass rounded-t-3xl p-5 border-b-0 border-x-0 max-h-[85vh] flex flex-col transition-all">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#000000] rounded-t-3xl p-5 border-t border-slate-200 dark:border-[#1f1f23] max-h-[85vh] flex flex-col transition-all">
           {/* Drawer Header */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
             <div>
@@ -174,7 +174,7 @@ export const BottomNav: React.FC = () => {
       )}
 
       {/* Bottom Sticky Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 liquid-glass border-b-0 border-x-0 px-3 py-1.5 shadow-lg">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#000000] border-t border-slate-200 dark:border-[#1f1f23] px-3 py-1.5 shadow-lg">
         <div className="flex items-center justify-between max-w-md mx-auto">
           {MAIN_MOBILE_NAV.map((item) => {
             const Icon = item.icon;
