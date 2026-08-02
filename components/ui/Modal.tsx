@@ -50,7 +50,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${widthClasses} max-w-[calc(100vw-1rem)] bg-white dark:bg-[#131b2e] rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 shadow-2xl border border-slate-100 dark:border-slate-800 z-10 my-auto mb-16 sm:mb-auto max-h-[82vh] sm:max-h-[90vh] flex flex-col box-border overflow-hidden`}
+        className={`relative w-full ${widthClasses} max-w-[calc(100vw-1rem)] bg-white/80 dark:bg-[#0b101d]/80 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 shadow-2xl border border-slate-200/60 dark:border-white/10 z-10 my-auto mb-16 sm:mb-auto max-h-[82vh] sm:max-h-[90vh] flex flex-col box-border overflow-hidden`}
       >
         <div className="flex items-center justify-between pb-2.5 sm:pb-4 border-b border-slate-100 dark:border-slate-800 mb-3 sm:mb-4 shrink-0">
           <h3 className="text-sm sm:text-lg font-extrabold text-slate-900 dark:text-white pr-2 truncate">{title}</h3>
