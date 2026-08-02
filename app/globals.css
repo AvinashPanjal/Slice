@@ -15,15 +15,16 @@
     --primary-foreground: #ffffff;
   }
 
+  /* StitchMCP AMOLED Dark Mode Design System */
   .dark {
-    --background: #0b1c30;
-    --surface: #131b2e;
-    --surface-low: #1a243a;
-    --surface-high: #213145;
-    --foreground: #f8f9ff;
-    --muted: #7c839b;
-    --border: #213145;
-    --primary: #3f465c;
+    --background: #000000;
+    --surface: #090e1a;
+    --surface-low: #0f172a;
+    --surface-high: #1e293b;
+    --foreground: #f8fafc;
+    --muted: #94a3b8;
+    --border: #1e293b;
+    --primary: #6366f1;
     --primary-foreground: #ffffff;
   }
 
@@ -34,7 +35,7 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar for AMOLED Dark Mode */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -47,5 +48,5 @@
   border-radius: 9999px;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1e293b;
 }
