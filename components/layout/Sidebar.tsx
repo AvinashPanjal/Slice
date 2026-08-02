@@ -32,7 +32,7 @@ export const Sidebar: React.FC = () => {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex flex-col w-64 border-r border-slate-200/60 dark:border-white/10 bg-white/70 dark:bg-[#000000]/80 backdrop-blur-2xl backdrop-saturate-150 min-h-screen p-5 sticky top-0 h-screen overflow-y-auto">
+    <aside className="hidden md:flex flex-col w-64 liquid-glass border-t-0 border-b-0 border-l-0 min-h-screen p-5 sticky top-0 h-screen overflow-y-auto">
       {/* Brand Header */}
       <div className="flex items-center space-x-3 px-2 py-3 mb-6">
         <div className="w-10 h-10 rounded-2xl bg-[#0b1c30] dark:bg-indigo-600 text-white flex items-center justify-center font-black shadow-md">
