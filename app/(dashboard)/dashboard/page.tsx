@@ -157,10 +157,15 @@ export default function DashboardPage() {
   maxUpcomingDate.setDate(todayDate.getDate() + 35);
   const maxUpcomingStr = maxUpcomingDate.toISOString().split('T')[0];
 
+  const todayDayOfMonth = todayDate.getDate();
+
   dues.forEach((d) => {
     if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return;
     const remaining = calculateDueRemaining(d, allocations);
     if (remaining <= 0) return;
+
+    // Rule: Before the 5th of the month (day < 5), do NOT show next month's dues (due_month > currentMonth) on the dashboard!
+    if (d.due_month > currentMonth && todayDayOfMonth < 5) return;
 
     // Only include dues that are OVERDUE or UPCOMING within next 35 days
     if (d.due_date > maxUpcomingStr && d.due_date > today) return;

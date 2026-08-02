@@ -166,11 +166,16 @@ export const getActiveTargetDues = (
   }
 
   // 2. If current/past month dues are cleared, find the earliest NEXT upcoming unpaid due
+  const todayDayOfMonth = parseInt((todayStr || '').split('-')[2] || '1', 10);
+
   const upcomingUnpaid = allDues
     .filter((d) => {
       if (d.status === 'PAID' || d.status === 'WAIVED' || d.status === 'SKIPPED') return false;
       const remaining = calculateDueRemaining(d, allocations);
-      return remaining > 0 && d.due_date > todayStr;
+      if (remaining <= 0) return false;
+      // Rule: Before the 5th of the month (day < 5), do NOT roll over to next month's due yet!
+      if (d.due_month > currentMonthStr && todayDayOfMonth < 5) return false;
+      return d.due_date > todayStr;
     })
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
@@ -179,7 +184,7 @@ export const getActiveTargetDues = (
     return upcomingUnpaid.filter((d) => d.due_month === nextDueMonth);
   }
 
-  // 3. Fallback: if all dues ever are paid, return current month dues list
+  // 3. Fallback: if all dues ever are paid or hidden before 5th, return current month dues list
   return allDues.filter((d) => d.due_month === currentMonthStr);
 };
 
