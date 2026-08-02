@@ -192,43 +192,43 @@ export default function PersonDetailPage() {
 
         {/* Aggregated Financial Bar */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mt-5 pt-5 border-t border-slate-100 dark:border-slate-800 text-xs w-full max-w-full box-border">
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Total Borrowed</p>
             <p className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white mt-0.5 truncate">
               {formatINR(summary.total_borrowed)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Total Paid</p>
             <p className="font-extrabold text-sm sm:text-base text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">
               {formatINR(summary.total_paid)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Outstanding</p>
             <p className="font-extrabold text-sm sm:text-base text-amber-600 dark:text-amber-400 mt-0.5 truncate">
               {formatINR(summary.outstanding)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Current Month Due</p>
             <p className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white mt-0.5 truncate">
               {formatINR(summary.current_month_due)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Month Paid</p>
             <p className="font-extrabold text-sm sm:text-base text-emerald-600 mt-0.5 truncate">
               {formatINR(summary.current_month_paid)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Month Pending</p>
             <p className="font-extrabold text-sm sm:text-base text-rose-600 mt-0.5 truncate">
               {formatINR(summary.current_month_pending)}
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800/80 col-span-2 sm:col-span-1">
+          <div className="bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl p-2.5 rounded-xl border border-slate-200/50 dark:border-white/10 col-span-2 sm:col-span-1">
             <p className="text-slate-400 font-bold uppercase text-[9px] sm:text-[10px] truncate">Overdue</p>
             <p className="font-extrabold text-sm sm:text-base text-rose-600 mt-0.5 truncate">
               {formatINR(summary.overdue_amount)}

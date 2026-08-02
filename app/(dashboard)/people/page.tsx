@@ -231,7 +231,7 @@ export default function PeoplePage() {
               </div>
 
               {/* Stats Summary */}
-              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl text-xs">
+              <div className="grid grid-cols-2 gap-2 p-3 bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl border border-slate-200/50 dark:border-white/10 rounded-2xl text-xs">
                 <div>
                   <p className="text-slate-400 text-[10px] uppercase font-bold">Total Borrowed</p>
                   <p className="font-bold text-slate-900 dark:text-white">{formatINR(s.total_borrowed)}</p>

@@ -315,10 +315,10 @@ export default function DashboardPage() {
               return (
                 <div
                   key={grp.groupKey}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`p-4 rounded-3xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 backdrop-blur-2xl backdrop-saturate-150 ${
                     grp.hasOverdue
-                      ? 'border-rose-300 dark:border-rose-900/60 bg-rose-500/5'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#131b2e]'
+                      ? 'border-rose-500/30 dark:border-rose-500/30 bg-rose-500/10 dark:bg-rose-950/20 shadow-[0_8px_32px_0_rgba(244,63,94,0.1)]'
+                      : 'border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-[#0b101d]/65 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] hover:border-indigo-500/30 dark:hover:border-white/20'
                   }`}
                 >
                   {/* Left: Borrower info */}
