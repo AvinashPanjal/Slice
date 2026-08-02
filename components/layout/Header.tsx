@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onOpenQuickAdd }) => {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0b1c30]/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-3 sm:px-8 py-3.5 flex items-center justify-between w-full max-w-full overflow-x-hidden box-border">
+    <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-3 sm:px-8 py-3.5 flex items-center justify-between w-full max-w-full overflow-x-hidden box-border">
       <div className="min-w-0 shrink">
         <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate">
           {title}

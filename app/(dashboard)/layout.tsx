@@ -50,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="flex min-h-screen bg-[#f8f9ff] dark:bg-[#0b1c30] w-full max-w-full overflow-x-hidden">
+    <div className="flex min-h-screen bg-[#f8f9ff] dark:bg-[#000000] w-full max-w-full overflow-x-hidden">
       {/* Desktop Sidebar */}
       <Sidebar />
 
