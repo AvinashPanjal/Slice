@@ -2,23 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Sun, Moon, LogOut, Calendar as CalendarIcon, Maximize, Minimize, Sparkles } from 'lucide-react';
+import { Plus, Sun, Moon, LogOut, Calendar as CalendarIcon, Maximize, Minimize } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { AIAssistantModal } from '@/components/ai/AIAssistantModal';
 import { formatMonthDisplay, getCurrentMonthStr } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
 
 interface HeaderProps {
   title: string;
   onOpenQuickAdd?: () => void;
-  onDataRefresh?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, onOpenQuickAdd, onDataRefresh }) => {
+export const Header: React.FC<HeaderProps> = ({ title, onOpenQuickAdd }) => {
   const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isAIOpen, setIsAIOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const currentMonth = formatMonthDisplay(getCurrentMonthStr());
   const supabase = createClient();
@@ -108,72 +105,53 @@ export const Header: React.FC<HeaderProps> = ({ title, onOpenQuickAdd, onDataRef
   };
 
   return (
-    <>
-      <header className="sticky top-0 z-30 bg-white dark:bg-[#000000] border-b border-slate-200/80 dark:border-[#1f1f23] px-3 sm:px-8 py-3.5 flex items-center justify-between w-full max-w-full overflow-x-hidden box-border">
-        <div className="min-w-0 shrink">
-          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate">
-            {title}
-          </h1>
-          <div className="hidden xs:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="truncate">{currentMonth}</span>
-          </div>
+    <header className="sticky top-0 z-30 bg-white dark:bg-[#000000] border-b border-slate-200/80 dark:border-[#1f1f23] px-3 sm:px-8 py-3.5 flex items-center justify-between w-full max-w-full overflow-x-hidden box-border">
+      <div className="min-w-0 shrink">
+        <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white truncate">
+          {title}
+        </h1>
+        <div className="hidden xs:flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="truncate">{currentMonth}</span>
         </div>
+      </div>
 
-        <div className="flex items-center space-x-1 sm:space-x-2.5 shrink-0">
-          {/* Malayalam AI Voice Assistant Button */}
-          <button
-            onClick={() => setIsAIOpen(true)}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold shadow-md hover:brightness-110 transition-all animate-pulse"
-            title="Open Malayalam AI Assistant"
-          >
-            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300" />
-            <span className="hidden xs:inline">മലയാളം AI</span>
-          </button>
+      <div className="flex items-center space-x-1 sm:space-x-2.5 shrink-0">
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+        >
+          {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
+        </button>
 
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-          >
-            {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
-          </button>
+        {/* Dark Mode Toggle */}
+        <button
+          onClick={toggleDarkMode}
+          className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          title="Toggle Dark Mode"
+        >
+          {darkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
+        </button>
 
-          {/* Dark Mode Toggle */}
-          <button
-            onClick={toggleDarkMode}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Toggle Dark Mode"
-          >
-            {darkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
-          </button>
+        {/* Quick Add Button */}
+        {onOpenQuickAdd && (
+          <Button onClick={onOpenQuickAdd} size="sm" className="shadow-md px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs">
+            <Plus className="w-4 h-4 sm:mr-1.5" />
+            <span className="hidden sm:inline">Quick Add</span>
+          </Button>
+        )}
 
-          {/* Quick Add Button */}
-          {onOpenQuickAdd && (
-            <Button onClick={onOpenQuickAdd} size="sm" className="shadow-md px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs">
-              <Plus className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Quick Add</span>
-            </Button>
-          )}
-
-          {/* User logout button */}
-          <button
-            onClick={handleLogout}
-            className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-            title="Log out"
-          >
-            <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-          </button>
-        </div>
-      </header>
-
-      {/* Floating Malayalam AI Assistant Modal */}
-      <AIAssistantModal
-        isOpen={isAIOpen}
-        onClose={() => setIsAIOpen(false)}
-        onDataRefresh={onDataRefresh}
-      />
-    </>
+        {/* User logout button */}
+        <button
+          onClick={handleLogout}
+          className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+          title="Log out"
+        >
+          <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
+      </div>
+    </header>
   );
 };

@@ -257,32 +257,6 @@ export default function SettingsPage() {
         </Card>
       </div>
 
-      {/* Google Gemini AI Studio API Key Card */}
-      <Card className="p-6 space-y-4 border-l-4 border-l-amber-500">
-        <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-          <Sparkles className="w-5 h-5 text-amber-500" />
-          <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
-            Google AI Live API Key (Malayalam Voice Control)
-          </h2>
-        </div>
-        <p className="text-xs text-slate-500">
-          Enter your custom Google AI Studio API Key (`AIzaSy...`) to power natural Malayalam & Manglish speech control.
-        </p>
-        <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row gap-3">
-          <Input
-            type="password"
-            placeholder="AIzaSy..."
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-            className="flex-1"
-          />
-          <Button type="submit" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white shrink-0">
-            <Save className="w-4 h-4 mr-1.5" />
-            Save Key
-          </Button>
-        </form>
-      </Card>
-
       {/* Profile Preferences */}
       <Card className="p-6 space-y-6">
         <div className="flex items-center space-x-2 pb-4 border-b border-slate-100 dark:border-slate-800">
