@@ -59,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Header
           title="LendWise"
           onOpenQuickAdd={() => setIsQuickAddOpen(true)}
+          onDataRefresh={fetchGlobalData}
         />
         <main className="flex-1 p-3 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-6 box-border">
           {children}

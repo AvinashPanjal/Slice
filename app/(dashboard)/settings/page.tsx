@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Profile, ReminderTemplate } from '@/lib/types';
-import { Settings as SettingsIcon, Save, MessageSquare, ShieldCheck } from 'lucide-react';
+import { Settings as SettingsIcon, Save, MessageSquare, ShieldCheck, Sparkles } from 'lucide-react';
 import { requestNotificationPermission, sendLocalNotification } from '@/lib/utils/notifications';
 
 export default function SettingsPage() {
@@ -181,13 +181,30 @@ export default function SettingsPage() {
     );
   }
 
+  const [geminiKey, setGeminiKey] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = localStorage.getItem('gemini_api_key') || '';
+      setGeminiKey(savedKey);
+    }
+  }, []);
+
+  const handleSaveGeminiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gemini_api_key', geminiKey.trim());
+      alert('Google Gemini AI Studio API Key saved successfully!');
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
           Application Preferences & Settings
         </h1>
-        <p className="text-xs text-slate-500">Configure profile, default currency, UPI address, and PWA installation</p>
+        <p className="text-xs text-slate-500">Configure profile, default currency, UPI address, Google AI key, and PWA installation</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -239,6 +256,32 @@ export default function SettingsPage() {
           </Button>
         </Card>
       </div>
+
+      {/* Google Gemini AI Studio API Key Card */}
+      <Card className="p-6 space-y-4 border-l-4 border-l-amber-500">
+        <div className="flex items-center space-x-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+          <Sparkles className="w-5 h-5 text-amber-500" />
+          <h2 className="text-base font-extrabold text-slate-900 dark:text-white">
+            Google AI Live API Key (Malayalam Voice Control)
+          </h2>
+        </div>
+        <p className="text-xs text-slate-500">
+          Enter your custom Google AI Studio API Key (`AIzaSy...`) to power natural Malayalam & Manglish speech control.
+        </p>
+        <form onSubmit={handleSaveGeminiKey} className="flex flex-col sm:flex-row gap-3">
+          <Input
+            type="password"
+            placeholder="AIzaSy..."
+            value={geminiKey}
+            onChange={(e) => setGeminiKey(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white shrink-0">
+            <Save className="w-4 h-4 mr-1.5" />
+            Save Key
+          </Button>
+        </form>
+      </Card>
 
       {/* Profile Preferences */}
       <Card className="p-6 space-y-6">
