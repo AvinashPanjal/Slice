@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase admin/server client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -50,7 +49,7 @@ function matchPersonByName(cleanText: string, peopleList: any[]) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, customApiKey, language = 'ml-IN' } = body;
+    const { prompt, customApiKey, language = 'ml-IN', clientLedgerData } = body;
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
@@ -58,14 +57,24 @@ export async function POST(req: NextRequest) {
 
     const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
-    // Fetch current financial state from Supabase to provide context to Gemini
-    const { data: people } = await supabase.from('people').select('*');
-    const { data: loans } = await supabase.from('loans').select('*');
-    const { data: dues } = await supabase.from('monthly_dues').select('*');
-    const { data: allocations } = await supabase.from('payment_allocations').select('*');
+    // Use client-provided live authenticated database records if available, otherwise fetch from Supabase
+    let people = clientLedgerData?.people;
+    let loans = clientLedgerData?.loans;
+    let dues = clientLedgerData?.dues;
+
+    if (!people || !loans || !dues) {
+      const [{ data: dbPeople }, { data: dbLoans }, { data: dbDues }] = await Promise.all([
+        supabase.from('people').select('*'),
+        supabase.from('loans').select('*'),
+        supabase.from('monthly_dues').select('*'),
+      ]);
+      people = people || dbPeople || [];
+      loans = loans || dbLoans || [];
+      dues = dues || dbDues || [];
+    }
 
     const cleanPrompt = prompt.toLowerCase().trim();
-    const matchedPerson = matchPersonByName(cleanPrompt, people || []);
+    const matchedPerson = matchPersonByName(cleanPrompt, people);
 
     const contextData = {
       targetPerson: matchedPerson
@@ -73,22 +82,16 @@ export async function POST(req: NextRequest) {
             id: matchedPerson.id,
             name: matchedPerson.name,
             phone: matchedPerson.phone,
-            dues: (dues || []).filter((d) => d.person_id === matchedPerson.id),
-            loans: (loans || []).filter((l) => l.person_id === matchedPerson.id),
+            dues: dues.filter((d: any) => d.person_id === matchedPerson.id),
+            loans: loans.filter((l: any) => l.person_id === matchedPerson.id),
           }
         : null,
-      peopleList: (people || []).map((p) => ({ id: p.id, name: p.name, phone: p.phone })),
-      loansSummary: (loans || []).map((l) => ({ id: l.id, person_id: l.person_id, amount: l.original_amount, status: l.status })),
-      activeDues: (dues || []).map((d) => ({
-        id: d.id,
-        person_id: d.person_id,
-        loan_id: d.loan_id,
-        due_month: d.due_month,
-        due_date: d.due_date,
-        original_amount: d.original_amount,
-        current_amount: d.current_amount,
-        status: d.status,
-      })),
+      allPeople: people.map((p: any) => {
+        const pDues = dues.filter((d: any) => d.person_id === p.id);
+        const pLoans = loans.filter((l: any) => l.person_id === p.id);
+        const totalDue = pDues.reduce((sum: number, d: any) => sum + Number(d.current_amount || 0), 0);
+        return { id: p.id, name: p.name, phone: p.phone, totalPendingDue: totalDue, activeLoansCount: pLoans.length };
+      }),
     };
 
     let actionTaken: string | null = null;
@@ -110,10 +113,10 @@ export async function POST(req: NextRequest) {
 
     if (isPaymentAction && matchedPerson) {
       // Find active due/loan for this person
-      const personDues = (dues || []).filter(
-        (d) => d.person_id === matchedPerson.id && d.status !== 'PAID' && d.status !== 'WAIVED'
+      const personDues = dues.filter(
+        (d: any) => d.person_id === matchedPerson.id && d.status !== 'PAID' && d.status !== 'WAIVED'
       );
-      const personLoans = (loans || []).filter((l) => l.person_id === matchedPerson.id && l.status === 'ACTIVE');
+      const personLoans = loans.filter((l: any) => l.person_id === matchedPerson.id && l.status === 'ACTIVE');
 
       const targetDue = personDues[0];
       const targetLoan = personLoans[0];
@@ -178,7 +181,7 @@ export async function POST(req: NextRequest) {
 The user speaks to you in Malayalam, Manglish, or English.
 User Question/Command: "${prompt}".
 ${matchedPerson ? `MATCHED PERSON IN LEDGER: Name: "${matchedPerson.name}" (ID: ${matchedPerson.id}).` : 'NO SPECIFIC PERSON MATCHED IN PROMPT.'}
-Ledger Data Context: ${JSON.stringify(contextData)}
+Live Database Ledger Context: ${JSON.stringify(contextData)}
 ${actionTaken ? `ACTION ALREADY EXECUTED: ${JSON.stringify(actionDetails)}.` : ''}
 
 Crucial Rules:
@@ -210,14 +213,14 @@ Crucial Rules:
       if (actionTaken === 'RECORD_PAYMENT' && actionDetails) {
         aiResponseText = `${actionDetails.personName}ന്റെ ₹${actionDetails.amount} പേയ്‌മെന്റായി വിജയകരമായി രേഖപ്പെടുത്തി.`;
       } else if (matchedPerson) {
-        const personDues = (dues || []).filter(
-          (d) => d.person_id === matchedPerson.id && d.status !== 'PAID' && d.status !== 'WAIVED'
+        const personDues = dues.filter(
+          (d: any) => d.person_id === matchedPerson.id && d.status !== 'PAID' && d.status !== 'WAIVED'
         );
-        const personLoans = (loans || []).filter(
-          (l) => l.person_id === matchedPerson.id && l.status === 'ACTIVE'
+        const personLoans = loans.filter(
+          (l: any) => l.person_id === matchedPerson.id && l.status === 'ACTIVE'
         );
-        const totalPendingDue = personDues.reduce((sum, d) => sum + Number(d.current_amount), 0);
-        const totalLoanAmt = personLoans.reduce((sum, l) => sum + Number(l.original_amount), 0);
+        const totalPendingDue = personDues.reduce((sum: number, d: any) => sum + Number(d.current_amount || 0), 0);
+        const totalLoanAmt = personLoans.reduce((sum: number, l: any) => sum + Number(l.original_amount || 0), 0);
 
         if (totalPendingDue > 0) {
           aiResponseText = `${matchedPerson.name}ന് നിലവിൽ ₹${totalPendingDue} ആണ് ഈ മാസത്തെ ബാക്കി കുടിശ്ശിക തുക.`;
@@ -227,9 +230,9 @@ Crucial Rules:
           aiResponseText = `${matchedPerson.name}ന് നിലവിൽ കുടിശ്ശികയൊന്നുമില്ല.`;
         }
       } else {
-        const totalDue = (dues || [])
-          .filter((d) => d.status !== 'PAID')
-          .reduce((sum, d) => sum + Number(d.current_amount), 0);
+        const totalDue = dues
+          .filter((d: any) => d.status !== 'PAID')
+          .reduce((sum: number, d: any) => sum + Number(d.current_amount || 0), 0);
         aiResponseText = `ഈ മാസത്തെ ആകെ കുടിശ്ശിക തുക ₹${totalDue} ആണ്. നിർദ്ദിഷ്ട ആളുടെ വിവരം അറിയാൻ പേര് പറയൂ.`;
       }
     }

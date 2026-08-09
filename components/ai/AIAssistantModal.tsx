@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { createClient } from '@/lib/supabase/client';
 
 interface AIAssistantModalProps {
   isOpen: boolean;
@@ -20,20 +21,45 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   const [transcript, setTranscript] = useState<string>('തത്സമയ മലയാളം വോയ്‌സ് കോളിലേക്ക് സ്വാഗതം! "സ്റ്റാർട്ട് കോൾ" ക്ലിക്ക് ചെയ്യൂ.');
   const [lastAction, setLastAction] = useState<{ title: string; details: string } | null>(null);
   const [matchedPersonName, setMatchedPersonName] = useState<string | null>(null);
+  const [clientLedgerData, setClientLedgerData] = useState<any>(null);
 
   const isCallActiveRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     isCallActiveRef.current = isCallActive;
   }, [isCallActive]);
 
-  // Stop call on modal close
+  // Pre-fetch user's live database ledger from Supabase browser client
+  const fetchLiveLedgerData = async () => {
+    try {
+      const [{ data: dbPeople }, { data: dbLoans }, { data: dbDues }] = await Promise.all([
+        supabase.from('people').select('*').eq('is_archived', false),
+        supabase.from('loans').select('*'),
+        supabase.from('monthly_dues').select('*'),
+      ]);
+
+      const ledger = {
+        people: dbPeople || [],
+        loans: dbLoans || [],
+        dues: dbDues || [],
+      };
+      setClientLedgerData(ledger);
+      return ledger;
+    } catch (e) {
+      console.error('Error pre-fetching ledger data:', e);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      fetchLiveLedgerData();
+    } else {
       endCall();
     }
   }, [isOpen]);
@@ -70,13 +96,24 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
       setConnectionStatus('CONNECTING');
       setIsCallActive(true);
       isCallActiveRef.current = true;
-      setTranscript('ഗൂഗിൾ AI ലൈവ് സിസ്റ്റവുമായി കണക്ട് ചെയ്യുന്നു...');
+      setTranscript('ഡാറ്റാബേസ് ഡാറ്റയും ഗൂഗിൾ AI സിസ്റ്റവും ലോഡ് ചെയ്യുന്നു...');
+
+      // Fetch fresh live database records
+      const freshLedger = await fetchLiveLedgerData();
 
       const apiKey = localStorage.getItem('gemini_api_key') || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
       // Welcome voice greeting
-      const initialGreeting = 'നമസ്കാരം! ഞാൻ LendWise AI ആണ്. സംസാരിക്കൂ.';
+      const initialGreeting = 'നമസ്കാരം! ഞാൻ LendWise AI ആണ്. നിങ്ങളുടെ ഡാറ്റാബേസ് കണക്ട് ആയിട്ടുണ്ട്. സംസാരിക്കൂ.';
       speakResponseMalayalam(initialGreeting);
+
+      // Build live ledger text summary to feed into Gemini system instruction
+      const ledgerSummary = (freshLedger?.people || []).map((p: any) => {
+        const pDues = (freshLedger?.dues || []).filter((d: any) => d.person_id === p.id && d.status !== 'PAID');
+        const pLoans = (freshLedger?.loans || []).filter((l: any) => l.person_id === p.id && l.status === 'ACTIVE');
+        const totalDue = pDues.reduce((sum: number, d: any) => sum + Number(d.current_amount || 0), 0);
+        return `- Borrower: "${p.name}" (ID: ${p.id}). Active Pending Monthly Due: ₹${totalDue}. Dues Detail: ${JSON.stringify(pDues.map((d: any) => ({ month: d.due_month, amount: d.current_amount })))}, Active Loans: ${pLoans.length}`;
+      }).join('\n');
 
       // Check if Gemini Live WebSocket is available
       if (apiKey && typeof window !== 'undefined' && 'WebSocket' in window) {
@@ -87,9 +124,9 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
           wsRef.current = ws;
 
           ws.onopen = () => {
-            console.log('Gemini Live API WebSocket Connected');
+            console.log('Gemini Live API WebSocket Connected with Live Ledger Context');
             setConnectionStatus('LIVE');
-            setTranscript('Gemini Live കണക്റ്റഡ്! തുടർച്ചയായി സംസാരിക്കാം.');
+            setTranscript('Gemini Live കണക്റ്റഡ്! ഡാറ്റാബേസ് ഡാറ്റ റെഡിയാണ്. സംസാരിക്കാം.');
 
             const setupMessage = {
               setup: {
@@ -106,9 +143,13 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                   parts: [
                     {
                       text: `You are LendWise Real-Time Malayalam Voice AI Assistant. You converse with the user via live bidirectional audio in fluent Malayalam.
-The user speaks to you in Malayalam or Manglish.
-When asked about a specific person (e.g. Abin), give THAT person's due only.
-When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Malayalam speech under 2 sentences.`,
+Here is the LIVE DATABASE LEDGER for the authenticated user:
+${ledgerSummary || 'No active borrowers currently in database.'}
+
+Instructions:
+1. Speak in natural Malayalam.
+2. When asked about a specific person (e.g. Abin), check their exact pending due from the ledger above and answer specifically.
+3. Execute function tools when user records payments. Keep spoken answers under 2 sentences.`,
                     },
                   ],
                 },
@@ -144,7 +185,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
 
           ws.onerror = (err) => {
             console.warn('Gemini Live WebSocket error, using Web Speech Stream:', err);
-            fallbackToWebSpeech();
+            fallbackToWebSpeech(freshLedger);
           };
 
           ws.onclose = () => {
@@ -156,7 +197,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
         }
       }
 
-      fallbackToWebSpeech();
+      fallbackToWebSpeech(freshLedger);
     } catch (err) {
       console.error('Failed to start Live Audio Call:', err);
       setConnectionStatus('DISCONNECTED');
@@ -205,7 +246,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
       setConnectionStatus('LISTENING');
     } catch (err) {
       console.error('Error starting microphone stream:', err);
-      fallbackToWebSpeech();
+      fallbackToWebSpeech(clientLedgerData);
     }
   };
 
@@ -242,8 +283,8 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
     }
   };
 
-  // Continuous Web Speech Stream with Auto-Restart Loop
-  const fallbackToWebSpeech = () => {
+  // Continuous Web Speech Stream with Live Ledger Data Payload
+  const fallbackToWebSpeech = (ledger: any) => {
     if (typeof window === 'undefined' || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setTranscript('ശബ്ദ സന്ദേശം പിന്തുണയ്ക്കുന്നില്ല. ബ്രൗസർ അപ്ഡേറ്റ് ചെയ്യുക.');
       setConnectionStatus('DISCONNECTED');
@@ -260,7 +301,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
     recognition.lang = 'ml-IN';
 
     setConnectionStatus('LIVE');
-    setTranscript('മലയാളം ലൈവ് വോയ്‌സ് റെഡി! പറയു... (e.g. "ആബിൻ 100 രൂപ നൽകി")');
+    setTranscript('മലയാളം ലൈവ് വോയ്‌സ് റെഡി! പറയു... (e.g. "ആബിന്റെ ഡ്യൂ എത്രയാണ്?")');
 
     recognition.onresult = async (event: any) => {
       const lastIndex = event.results.length - 1;
@@ -279,6 +320,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
               prompt: spokenText,
               customApiKey: storedApiKey,
               language: 'ml-IN',
+              clientLedgerData: ledger || clientLedgerData,
             }),
           });
 
@@ -295,6 +337,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
                 title: 'പേയ്‌മെന്റ് രേഖപ്പെടുത്തി',
                 details: `${data.actionDetails.personName}: ₹${data.actionDetails.amount}`,
               });
+              fetchLiveLedgerData();
               if (onDataRefresh) onDataRefresh();
             }
           }
@@ -304,16 +347,13 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
       }
     };
 
-    // Auto-restart recognition loop so it NEVER turns off after 1st chat turn
     recognition.onend = () => {
       console.log('Speech recognition paused/ended. Auto restarting continuous loop...');
       if (isCallActiveRef.current && recognitionRef.current) {
         try {
           recognitionRef.current.start();
           setConnectionStatus('LISTENING');
-        } catch (e) {
-          // Already active
-        }
+        } catch (e) {}
       }
     };
 
@@ -354,7 +394,6 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
 
       utterance.onend = () => {
         setConnectionStatus('LISTENING');
-        // Restart speech recognition if ended
         if (isCallActiveRef.current && recognitionRef.current) {
           try {
             recognitionRef.current.start();
@@ -375,12 +414,14 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
         body: JSON.stringify({
           prompt: JSON.stringify(toolCall),
           customApiKey: storedApiKey,
+          clientLedgerData,
         }),
       });
 
       const data = await res.json();
-      if (data.actionTaken && onDataRefresh) {
-        onDataRefresh();
+      if (data.actionTaken) {
+        fetchLiveLedgerData();
+        if (onDataRefresh) onDataRefresh();
       }
 
       ws.send(
@@ -443,11 +484,11 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
             <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-emerald-500 animate-ping' : 'bg-zinc-600'}`} />
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
               {connectionStatus === 'LIVE' || connectionStatus === 'LISTENING'
-                ? '🎙️ LIVE (CONTINUOUS VOICE)'
+                ? '🎙️ LIVE (DATABASE CONNECTED)'
                 : connectionStatus === 'SPEAKING'
                 ? '🔊 GEMINI SPEAKING...'
                 : connectionStatus === 'CONNECTING'
-                ? '⏳ CONNECTING...'
+                ? '⏳ LOADING DATA & CONNECTING...'
                 : 'OFFLINE'}
             </span>
           </div>
@@ -491,7 +532,7 @@ When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Mal
           <h3 className="mt-5 text-xl font-black tracking-tight text-center">
             {isCallActive ? 'LendWise Gemini Live' : 'Google AI Live Stream'}
           </h3>
-          <p className="text-xs text-zinc-400 mt-1">Hands-Free Continuous Malayalam Call</p>
+          <p className="text-xs text-zinc-400 mt-1">Real-Time Database Connected Malayalam Call</p>
 
           {/* Person Matched Live Chip */}
           {matchedPersonName && (
