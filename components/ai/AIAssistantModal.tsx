@@ -1,17 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Sparkles, X, Volume2, CheckCircle2, Bot, User } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-
-interface Message {
-  id: string;
-  sender: 'USER' | 'AI';
-  text: string;
-  actionTaken?: string | null;
-  actionDetails?: any;
-  timestamp: string;
-}
 
 interface AIAssistantModalProps {
   isOpen: boolean;
@@ -24,313 +15,448 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   onClose,
   onDataRefresh,
 }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'init-1',
-      sender: 'AI',
-      text: 'നമസ്കാരം! ഞാൻ നിങ്ങളുടെ LendWise മലയാളം AI അസിസ്റ്റന്റാണ്. "ആബിൻ 100 rs നൽകി", "ഈ മാസത്തെ കുടിശ്ശിക എത്രയാണ്?" തുടങ്ങിയ കാര്യങ്ങൾ എന്നോട് പറയാം.',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
-  const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [speechLanguage, setSpeechLanguage] = useState<'ml-IN' | 'en-IN'>('ml-IN');
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'LIVE' | 'SPEAKING' | 'LISTENING'>('DISCONNECTED');
+  const [transcript, setTranscript] = useState<string>('തത്സമയ മലയാളം വോയ്‌സ് കോളിലേക്ക് സ്വാഗതം! "സ്റ്റാർട്ട് കോൾ" ക്ലിക്ക് ചെയ്യൂ.');
+  const [lastAction, setLastAction] = useState<{ title: string; details: string } | null>(null);
 
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
-  const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  // Initialize Audio & Speech Systems
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // Setup Web Speech Recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = speechLanguage;
-
-      recognitionRef.current.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((result: any) => result[0].transcript)
-          .join('');
-        setInputText(transcript);
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
+    if (!isOpen) {
+      endCall();
     }
-  }, [speechLanguage]);
+  }, [isOpen]);
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech Recognition is not supported in your browser. Please type your query in the chat input.');
-      return;
-    }
+  const startCall = async () => {
+    try {
+      setConnectionStatus('CONNECTING');
+      setIsCallActive(true);
+      setTranscript('ഗൂഗിൾ AI ലൈവ് API-യുമായി കണക്ട് ചെയ്യുന്നു...');
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      setInputText('');
-      recognitionRef.current.lang = speechLanguage;
-      recognitionRef.current.start();
-      setIsListening(true);
+      const apiKey = localStorage.getItem('gemini_api_key') || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+
+      // Check if WebSocket BidiGenerateContent is supported
+      if (apiKey && typeof window !== 'undefined' && 'WebSocket' in window) {
+        const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+
+        try {
+          const ws = new WebSocket(wsUrl);
+          wsRef.current = ws;
+
+          ws.onopen = () => {
+            console.log('Gemini Live API WebSocket Connected');
+            setConnectionStatus('LIVE');
+            setTranscript('Gemini Live കണക്റ്റഡ്! മലയാളത്തിൽ പറയൂ (e.g., "ആബിൻ 100 രൂപ നൽകി").');
+
+            // Send Handshake Setup Message
+            const setupMessage = {
+              setup: {
+                model: 'models/gemini-2.0-flash-exp',
+                generationConfig: {
+                  responseModalities: ['AUDIO', 'TEXT'],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: 'Puck' },
+                    },
+                  },
+                },
+                systemInstruction: {
+                  parts: [
+                    {
+                      text: `You are LendWise Real-Time Malayalam Voice AI Assistant. You converse with the user via live bidirectional audio in fluent Malayalam.
+The user speaks to you in Malayalam or Manglish.
+You have tools to record payments (e.g. Abin paid 100 rs) and query monthly dues.
+When an action is taken, confirm it clearly in Malayalam speech. Keep spoken answers concise and clear under 2 sentences.`,
+                    },
+                  ],
+                },
+              },
+            };
+            ws.send(JSON.stringify(setupMessage));
+
+            // Start Audio Capture Stream
+            startMicrophoneStream(ws);
+          };
+
+          ws.onmessage = async (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              
+              // Handle Live Server Audio Output
+              if (data.serverContent?.modelTurn?.parts) {
+                for (const part of data.serverContent.modelTurn.parts) {
+                  if (part.text) {
+                    setTranscript(part.text);
+                  }
+                  if (part.inlineData && part.inlineData.mimeType?.startsWith('audio/pcm')) {
+                    setConnectionStatus('SPEAKING');
+                    playPcmAudio(part.inlineData.data);
+                  }
+                }
+              }
+
+              // Handle Function Calls (Tool Execution)
+              if (data.toolCall) {
+                handleFunctionCall(data.toolCall, ws);
+              }
+            } catch (e) {
+              console.error('Error parsing WebSocket message:', e);
+            }
+          };
+
+          ws.onerror = (err) => {
+            console.warn('Gemini Live WebSocket error, switching to Web Speech Realtime Stream:', err);
+            fallbackToWebSpeech();
+          };
+
+          ws.onclose = () => {
+            console.log('Gemini Live WebSocket closed');
+          };
+          return;
+        } catch (e) {
+          console.warn('Direct WebSocket failed, using Web Speech Stream:', e);
+        }
+      }
+
+      fallbackToWebSpeech();
+    } catch (err) {
+      console.error('Failed to start Live Audio Call:', err);
+      setConnectionStatus('DISCONNECTED');
+      setIsCallActive(false);
     }
   };
 
-  // Speak response in Malayalam
-  const speakText = (text: string) => {
+  // Capture Microphone Audio (16kHz PCM)
+  const startMicrophoneStream = async (ws: WebSocket) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      audioCtxRef.current = audioCtx;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Convert Float32 to Int16 PCM
+        const pcm16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        }
+
+        // Send base64 PCM chunk
+        const base64Pcm = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+        ws.send(
+          JSON.stringify({
+            realtimeInput: {
+              mediaChunks: [
+                {
+                  mimeType: 'audio/pcm;rate=16000',
+                  data: base64Pcm,
+                },
+              ],
+            },
+          })
+        );
+      };
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+      setConnectionStatus('LISTENING');
+    } catch (err) {
+      console.error('Error starting microphone stream:', err);
+      fallbackToWebSpeech();
+    }
+  };
+
+  // Playback PCM Audio from Gemini Live API
+  const playPcmAudio = (base64Pcm: string) => {
+    try {
+      const binaryStr = atob(base64Pcm);
+      const len = binaryStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const int16Array = new Int16Array(bytes.buffer);
+
+      const audioCtx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const buffer = audioCtx.createBuffer(1, int16Array.length, 24000);
+      const channelData = buffer.getChannelData(0);
+
+      for (let i = 0; i < int16Array.length; i++) {
+        channelData[i] = int16Array[i] / 32768;
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.start(0);
+
+      source.onended = () => {
+        setConnectionStatus('LISTENING');
+      };
+    } catch (e) {
+      console.error('Error playing PCM audio:', e);
+    }
+  };
+
+  // Fallback to Web Speech API + Gemini REST Backend for seamless audio streaming
+  const fallbackToWebSpeech = () => {
+    if (typeof window === 'undefined' || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      setTranscript('ശബ്ദ സന്ദേശം പിന്തുണയ്ക്കുന്നില്ല. ബ്രൗസർ അപ്ഡേറ്റ് ചെയ്യുക.');
+      setConnectionStatus('DISCONNECTED');
+      setIsCallActive(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'ml-IN';
+
+    setConnectionStatus('LIVE');
+    setTranscript('മലയാളം ലൈവ് വോയ്‌സ് റെഡി! പറയു... (e.g. "ആബിൻ 100 രൂപ നൽകി")');
+
+    recognition.onresult = async (event: any) => {
+      const lastIndex = event.results.length - 1;
+      const spokenText = event.results[lastIndex][0].transcript;
+
+      if (spokenText && spokenText.trim()) {
+        setTranscript(`താങ്കൾ പറഞ്ഞത്: "${spokenText}"`);
+        setConnectionStatus('SPEAKING');
+
+        // Call backend tool execution route
+        try {
+          const storedApiKey = localStorage.getItem('gemini_api_key') || '';
+          const res = await fetch('/api/ai-assistant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: spokenText,
+              customApiKey: storedApiKey,
+              language: 'ml-IN',
+            }),
+          });
+
+          const data = await res.json();
+          if (data.response) {
+            setTranscript(data.response);
+            speakResponseMalayalam(data.response);
+
+            if (data.actionTaken === 'RECORD_PAYMENT' && data.actionDetails) {
+              setLastAction({
+                title: 'പേയ്‌മെന്റ് രേഖപ്പെടുത്തി',
+                details: `${data.actionDetails.personName}: ₹${data.actionDetails.amount}`,
+              });
+              if (onDataRefresh) onDataRefresh();
+            }
+          }
+        } catch (err) {
+          console.error('Error processing speech query:', err);
+        }
+      }
+    };
+
+    recognition.onerror = (err: any) => {
+      console.error('Speech recognition error:', err);
+    };
+
+    recognition.start();
+  };
+
+  const speakResponseMalayalam = (text: string) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stop any ongoing speech
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = speechLanguage === 'ml-IN' ? 'ml-IN' : 'en-IN';
+      utterance.lang = 'ml-IN';
       utterance.rate = 0.95;
 
-      // Try to find Malayalam voice if available
       const voices = window.speechSynthesis.getVoices();
       const mlVoice = voices.find((v) => v.lang.includes('ml') || v.name.toLowerCase().includes('malayalam'));
-      if (mlVoice) {
-        utterance.voice = mlVoice;
-      }
+      if (mlVoice) utterance.voice = mlVoice;
+
+      utterance.onend = () => {
+        setConnectionStatus('LISTENING');
+      };
 
       window.speechSynthesis.speak(utterance);
     }
   };
 
-  const handleSend = async (customPrompt?: string) => {
-    const promptToSend = customPrompt || inputText;
-    if (!promptToSend.trim() || loading) return;
-
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: 'USER',
-      text: promptToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInputText('');
-    setLoading(true);
-
+  const handleFunctionCall = async (toolCall: any, ws: WebSocket) => {
     try {
-      // Get stored user API Key if set in Settings
-      const storedApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null;
-
+      const storedApiKey = localStorage.getItem('gemini_api_key') || '';
       const res = await fetch('/api/ai-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: promptToSend,
+          prompt: JSON.stringify(toolCall),
           customApiKey: storedApiKey,
-          language: speechLanguage,
         }),
       });
 
       const data = await res.json();
-
-      if (data.response) {
-        const aiMsg: Message = {
-          id: (Date.now() + 1).toString(),
-          sender: 'AI',
-          text: data.response,
-          actionTaken: data.actionTaken,
-          actionDetails: data.actionDetails,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-
-        setMessages((prev) => [...prev, aiMsg]);
-        speakText(data.response);
-
-        // If financial action was taken (e.g. payment recorded), trigger dashboard data refresh!
-        if (data.actionTaken && onDataRefresh) {
-          onDataRefresh();
-        }
+      if (data.actionTaken && onDataRefresh) {
+        onDataRefresh();
       }
-    } catch (err) {
-      console.error('Error querying AI Assistant:', err);
-      const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'AI',
-        text: 'ക്ഷമിക്കണം, എനിക്ക് നിങ്ങളുടെ ആവശ്യം പ്രോസസ്സ് ചെയ്യാൻ കഴിഞ്ഞില്ല. ദയവായി വീണ്ടും ശ്രമിക്കൂ.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setLoading(false);
+
+      // Return Tool Response to Gemini WebSocket
+      ws.send(
+        JSON.stringify({
+          toolResponse: {
+            functionResponses: [
+              {
+                response: { output: data },
+                id: toolCall.functionCalls?.[0]?.id,
+              },
+            ],
+          },
+        })
+      );
+    } catch (e) {
+      console.error('Tool execution error:', e);
     }
+  };
+
+  const endCall = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close();
+      audioCtxRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsCallActive(false);
+    setConnectionStatus('DISCONNECTED');
+    setTranscript('കോൾ അവസാനിച്ചു.');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
-        onClick={onClose}
-      />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Dark Blur Overlay */}
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-xl" onClick={onClose} />
 
-      {/* Liquid Glass Dialog Container */}
-      <div className="relative w-full max-w-lg liquid-glass rounded-3xl p-4 sm:p-6 z-10 my-auto shadow-2xl flex flex-col h-[85vh] max-h-[700px] border border-white/20 dark:border-white/10 overflow-hidden box-border">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-zinc-800 shrink-0">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg animate-pulse">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-                <span>LendWise Malayalam AI</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/30">
-                  Gemini Live
-                </span>
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">സംസാരിക്കാം, പേയ്‌മെന്റുകൾ അടയാളപ്പെടുത്താം</p>
-            </div>
-          </div>
-
+      {/* Gemini Live Call Modal Container */}
+      <div className="relative w-full max-w-md bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-6 text-white shadow-2xl z-10 flex flex-col items-center justify-between min-h-[520px]">
+        {/* Top Header Controls */}
+        <div className="w-full flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {/* Language Selector Chip */}
-            <button
-              onClick={() => setSpeechLanguage(speechLanguage === 'ml-IN' ? 'en-IN' : 'ml-IN')}
-              className="text-[10px] font-extrabold px-2.5 py-1 rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors border border-zinc-700"
-            >
-              {speechLanguage === 'ml-IN' ? '🇮🇳 മലയാളം' : '🌐 Manglish'}
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-emerald-500 animate-ping' : 'bg-zinc-600'}`} />
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+              {connectionStatus === 'LIVE' || connectionStatus === 'LISTENING'
+                ? '🎙️ LIVE MALAYALAM VOICE'
+                : connectionStatus === 'SPEAKING'
+                ? '🔊 GEMINI SPEAKING...'
+                : connectionStatus === 'CONNECTING'
+                ? '⏳ CONNECTING...'
+                : 'OFFLINE'}
+            </span>
           </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-zinc-900 text-zinc-400 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Conversation Message Feed */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${msg.sender === 'USER' ? 'items-end' : 'items-start'}`}
-            >
-              <div className="flex items-end space-x-2 max-w-[88%]">
-                {msg.sender === 'AI' && (
-                  <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mb-1">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                )}
-
-                <div
-                  className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm ${
-                    msg.sender === 'USER'
-                      ? 'bg-indigo-600 text-white rounded-br-none font-medium'
-                      : 'bg-zinc-900/90 dark:bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-bl-none'
-                  }`}
-                >
-                  <p>{msg.text}</p>
-
-                  {/* Executed Action Badge */}
-                  {msg.actionTaken === 'RECORD_PAYMENT' && msg.actionDetails && (
-                    <div className="mt-2 pt-2 border-t border-emerald-500/30 flex items-center space-x-1.5 text-emerald-400 font-bold text-[11px]">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>
-                        {msg.actionDetails.personName}: ₹{msg.actionDetails.amount} രേഖപ്പെടുത്തി!
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {msg.sender === 'USER' && (
-                  <div className="w-7 h-7 rounded-xl bg-zinc-800 text-zinc-300 flex items-center justify-center shrink-0 mb-1">
-                    <User className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-
-              <span className="text-[10px] text-zinc-500 mt-1 px-1">{msg.timestamp}</span>
-            </div>
-          ))}
-
-          {loading && (
-            <div className="flex items-center space-x-2 text-zinc-400 text-xs py-2 px-3 bg-zinc-900/60 rounded-2xl w-fit">
-              <Sparkles className="w-4 h-4 animate-spin text-indigo-400" />
-              <span>മലയാളത്തിൽ ചിന്തിക്കുന്നു...</span>
-            </div>
+        {/* Central Audio Orb / Visualizer */}
+        <div className="my-8 flex flex-col items-center justify-center relative">
+          {/* Animated Pulsing Rings */}
+          {isCallActive && (
+            <>
+              <div className="absolute w-44 h-44 rounded-full bg-gradient-to-tr from-indigo-600/30 to-purple-600/30 animate-ping duration-1000" />
+              <div className="absolute w-36 h-36 rounded-full bg-indigo-500/20 animate-pulse" />
+            </>
           )}
 
-          <div ref={chatBottomRef} />
-        </div>
-
-        {/* Malayalam Suggestion Chips */}
-        <div className="py-2 flex items-center space-x-2 overflow-x-auto shrink-0 scrollbar-none">
-          <button
-            onClick={() => handleSend('ഈ മാസത്തെ കുടിശ്ശിക എത്രയാണ്?')}
-            className="text-[11px] whitespace-nowrap px-3 py-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-colors"
+          <div
+            className={`w-28 h-28 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
+              connectionStatus === 'SPEAKING'
+                ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 scale-110 shadow-emerald-500/40'
+                : isCallActive
+                ? 'bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 shadow-indigo-500/50 scale-105'
+                : 'bg-zinc-800 text-zinc-500'
+            }`}
           >
-            📊 കുടിശ്ശിക വിവരം
-          </button>
-
-          <button
-            onClick={() => handleSend('ആബിൻ 100 rs നൽകി എന്ന് രേഖപ്പെടുത്തൂ')}
-            className="text-[11px] whitespace-nowrap px-3 py-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-colors"
-          >
-            💸 "Abin 100 rs paid"
-          </button>
-
-          <button
-            onClick={() => handleSend('ആബിന്റെ അഡൈവ് പൂർണ്ണമായി അടച്ചു')}
-            className="text-[11px] whitespace-nowrap px-3 py-1.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-colors"
-          >
-            ✅ "Mark Abin Paid"
-          </button>
-        </div>
-
-        {/* Input Bar & Mic Button */}
-        <div className="pt-2 border-t border-zinc-800 shrink-0">
-          <div className="flex items-center space-x-2">
-            {/* Mic Listening Button */}
-            <button
-              onClick={toggleListening}
-              className={`p-3 rounded-2xl transition-all shadow-md shrink-0 ${
-                isListening
-                  ? 'bg-rose-600 text-white animate-bounce ring-4 ring-rose-500/30'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
-              }`}
-              title={isListening ? 'Stop Listening' : 'Speak in Malayalam'}
-            >
-              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </button>
-
-            {/* Input Text Box */}
-            <input
-              type="text"
-              placeholder={isListening ? 'സംസാരിക്കൂ... Listening...' : 'മലയാളത്തിൽ പറയൂ... (e.g. Abin 100 rs paid)'}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              className="flex-1 bg-zinc-900/90 text-white placeholder-zinc-500 text-xs sm:text-sm px-4 py-3 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-
-            {/* Send Button */}
-            <Button
-              onClick={() => handleSend()}
-              disabled={!inputText.trim() || loading}
-              className="p-3 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 shrink-0"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+            {connectionStatus === 'SPEAKING' ? (
+              <Volume2 className="w-12 h-12 text-white animate-bounce" />
+            ) : isCallActive ? (
+              <Mic className="w-12 h-12 text-white animate-pulse" />
+            ) : (
+              <Radio className="w-10 h-10 text-zinc-400" />
+            )}
           </div>
+
+          <h3 className="mt-6 text-xl font-black tracking-tight text-center">
+            {isCallActive ? 'LendWise Gemini Live' : 'Google AI Live Stream'}
+          </h3>
+          <p className="text-xs text-zinc-400 mt-1">Real-time Malayalam Voice Conversation</p>
+        </div>
+
+        {/* Realtime Live Transcript Box */}
+        <div className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 text-center text-xs leading-relaxed min-h-[70px] flex items-center justify-center shadow-inner">
+          <p className="text-zinc-200 font-medium">{transcript}</p>
+        </div>
+
+        {/* Action Executed Banner */}
+        {lastAction && (
+          <div className="mt-3 w-full bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-3 flex items-center space-x-3 text-xs text-emerald-400">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
+            <div>
+              <p className="font-extrabold text-[11px] uppercase tracking-wider">{lastAction.title}</p>
+              <p className="text-zinc-200 text-xs font-semibold">{lastAction.details}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Call Action Buttons */}
+        <div className="w-full pt-6 flex items-center justify-center space-x-4">
+          {!isCallActive ? (
+            <button
+              onClick={startCall}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-sm flex items-center justify-center space-x-2 shadow-xl shadow-emerald-950 transition-all hover:scale-[1.02]"
+            >
+              <PhoneCall className="w-5 h-5" />
+              <span>മലയാളം വോയ്‌സ് കോൾ ആരംഭിക്കൂ (Start Call)</span>
+            </button>
+          ) : (
+            <button
+              onClick={endCall}
+              className="w-full py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-sm flex items-center justify-center space-x-2 shadow-xl shadow-rose-950 transition-all hover:scale-[1.02]"
+            >
+              <PhoneOff className="w-5 h-5" />
+              <span>കോൾ അവസാനിപ്പിക്കൂ (End Call)</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
