@@ -6,6 +6,47 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper function to match person by name (English, Manglish, or Malayalam script)
+function matchPersonByName(cleanText: string, peopleList: any[]) {
+  if (!peopleList || peopleList.length === 0) return null;
+
+  // 1. Direct exact or substring match
+  let found = peopleList.find((p) => cleanText.includes(p.name.toLowerCase()));
+  if (found) return found;
+
+  // 2. First name match (e.g. "Abin" from "Abin V")
+  found = peopleList.find((p) => {
+    const firstName = p.name.split(' ')[0].toLowerCase();
+    return firstName.length >= 3 && cleanText.includes(firstName);
+  });
+  if (found) return found;
+
+  // 3. Common Malayalam transliterated script to English alias mapping
+  const malayalamNameMap: Record<string, string[]> = {
+    'ആബിൻ': ['abin', 'abhin'],
+    'അബിൻ': ['abin', 'abhin'],
+    'കൊച്ചു': ['kochu'],
+    'ശിവൻ': ['sivan'],
+    'ആനന്ദ്': ['anand'],
+    'സുനിൽ': ['sunil'],
+    'വിനോദ്': ['vinod'],
+    'അരുൺ': ['arun'],
+    'രാഹുൽ': ['rahul'],
+    'വിഷ്ണു': ['vishnu'],
+  };
+
+  for (const p of peopleList) {
+    const pLower = p.name.toLowerCase();
+    for (const [mlScript, aliases] of Object.entries(malayalamNameMap)) {
+      if (aliases.some((a) => pLower.includes(a)) && cleanText.includes(mlScript)) {
+        return p;
+      }
+    }
+  }
+
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -23,7 +64,19 @@ export async function POST(req: NextRequest) {
     const { data: dues } = await supabase.from('monthly_dues').select('*');
     const { data: allocations } = await supabase.from('payment_allocations').select('*');
 
+    const cleanPrompt = prompt.toLowerCase().trim();
+    const matchedPerson = matchPersonByName(cleanPrompt, people || []);
+
     const contextData = {
+      targetPerson: matchedPerson
+        ? {
+            id: matchedPerson.id,
+            name: matchedPerson.name,
+            phone: matchedPerson.phone,
+            dues: (dues || []).filter((d) => d.person_id === matchedPerson.id),
+            loans: (loans || []).filter((l) => l.person_id === matchedPerson.id),
+          }
+        : null,
       peopleList: (people || []).map((p) => ({ id: p.id, name: p.name, phone: p.phone })),
       loansSummary: (loans || []).map((l) => ({ id: l.id, person_id: l.person_id, amount: l.original_amount, status: l.status })),
       activeDues: (dues || []).map((d) => ({
@@ -41,9 +94,6 @@ export async function POST(req: NextRequest) {
     let actionTaken: string | null = null;
     let actionDetails: any = null;
 
-    // Direct Intent Parsing for Financial Actions (e.g. "Abin 100 rs paid", "Mark Abin due paid", etc.)
-    const cleanPrompt = prompt.toLowerCase().trim();
-    
     // Check if user is asking to record a payment or mark due paid
     const isPaymentAction =
       cleanPrompt.includes('paid') ||
@@ -53,11 +103,6 @@ export async function POST(req: NextRequest) {
       cleanPrompt.includes('നൽകി') ||
       cleanPrompt.includes('ക അടച്ചു') ||
       cleanPrompt.includes('rs');
-
-    // Extract person name from prompt
-    let matchedPerson = (people || []).find((p) =>
-      cleanPrompt.includes(p.name.toLowerCase())
-    );
 
     // Extract amount if present
     const amountMatch = cleanPrompt.match(/(\d+)\s*(rs|rupees|രൂപ)?/i) || cleanPrompt.match(/(rs|rupees|രൂപ)\s*(\d+)/i);
@@ -130,16 +175,16 @@ export async function POST(req: NextRequest) {
     if (apiKey) {
       try {
         const systemInstruction = `You are LendWise Malayalam Voice AI Assistant, an expert personal ledger manager.
-The user speaks to you in Malayalam, Manglish (Malayalam written in Latin script), or English.
-Analyze the user's input: "${prompt}".
-Current Ledger Database Context: ${JSON.stringify(contextData)}
-${actionTaken ? `An action was ALREADY executed in the system: ${JSON.stringify(actionDetails)}.` : ''}
+The user speaks to you in Malayalam, Manglish, or English.
+User Question/Command: "${prompt}".
+${matchedPerson ? `MATCHED PERSON IN LEDGER: Name: "${matchedPerson.name}" (ID: ${matchedPerson.id}).` : 'NO SPECIFIC PERSON MATCHED IN PROMPT.'}
+Ledger Data Context: ${JSON.stringify(contextData)}
+${actionTaken ? `ACTION ALREADY EXECUTED: ${JSON.stringify(actionDetails)}.` : ''}
 
-Instructions:
-1. Provide a helpful, clear, and polite response in Malayalam (and optionally Manglish/English).
-2. If an action was taken (e.g. payment recorded for Abin), confirm it clearly in Malayalam (e.g., "${matchedPerson?.name || 'ആബിൻ'}ന്റെ ₹${actionDetails?.amount || 100} അടവ് രേഖപ്പെടുത്തി. നന്ദി!").
-3. If the user asked about due amount (e.g. "Abin eethra tharaan und?"), extract their exact due amount from context and state it clearly.
-4. Keep the response concise, friendly, and under 3 sentences for natural speech synthesis.`;
+Crucial Rules:
+1. If a person was matched (e.g. "${matchedPerson?.name || 'Abin'}"), answer SPECIFICALLY about that person's due amount and status. DO NOT talk about total due unless explicitly asked for overall summary!
+2. If payment action was taken (e.g. ₹100 for Abin), confirm it clearly in Malayalam: "${matchedPerson?.name || 'ആബിൻ'}ന്റെ ₹${actionDetails?.amount || 100} പേയ്‌മെന്റ് രേഖപ്പെടുത്തി. നന്ദി!".
+3. Keep spoken responses short, friendly, and concise under 2 sentences in natural Malayalam.`;
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -148,34 +193,44 @@ Instructions:
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: systemInstruction }] }],
-              generationConfig: { temperature: 0.3, maxOutputTokens: 250 },
+              generationConfig: { temperature: 0.2, maxOutputTokens: 250 },
             }),
           }
         );
 
         const resData = await response.json();
-        aiResponseText =
-          resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        aiResponseText = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       } catch (geminiErr) {
         console.error('Gemini API call failed:', geminiErr);
       }
     }
 
-    // Fallback response if Gemini API key was not provided or returned empty
+    // Fallback response generator if Gemini returned empty or key was omitted
     if (!aiResponseText) {
       if (actionTaken === 'RECORD_PAYMENT' && actionDetails) {
-        aiResponseText = `${actionDetails.personName}ന്റെ ₹${actionDetails.amount} തുക പേയ്‌മെന്റായി വിജയകരമായി രേഖപ്പെടുത്തി. (${actionDetails.isFull ? 'പൂർണ്ണമായി അടച്ചു' : 'ഭാഗികമായി അടച്ചു'})`;
+        aiResponseText = `${actionDetails.personName}ന്റെ ₹${actionDetails.amount} പേയ്‌മെന്റായി വിജയകരമായി രേഖപ്പെടുത്തി.`;
       } else if (matchedPerson) {
         const personDues = (dues || []).filter(
-          (d) => d.person_id === matchedPerson.id && d.status !== 'PAID'
+          (d) => d.person_id === matchedPerson.id && d.status !== 'PAID' && d.status !== 'WAIVED'
         );
-        const totalPending = personDues.reduce((sum, d) => sum + Number(d.current_amount), 0);
-        aiResponseText = `${matchedPerson.name}ന് നിലവിൽ ₹${totalPending} ആണ് ഈ മാസത്തെ ബാക്കി കുടിശ്ശിക തുക.`;
+        const personLoans = (loans || []).filter(
+          (l) => l.person_id === matchedPerson.id && l.status === 'ACTIVE'
+        );
+        const totalPendingDue = personDues.reduce((sum, d) => sum + Number(d.current_amount), 0);
+        const totalLoanAmt = personLoans.reduce((sum, l) => sum + Number(l.original_amount), 0);
+
+        if (totalPendingDue > 0) {
+          aiResponseText = `${matchedPerson.name}ന് നിലവിൽ ₹${totalPendingDue} ആണ് ഈ മാസത്തെ ബാക്കി കുടിശ്ശിക തുക.`;
+        } else if (totalLoanAmt > 0) {
+          aiResponseText = `${matchedPerson.name}ന്റെ ഈ മാസത്തെ കുടിശ്ശിക പൂർണ്ണമായി അടച്ചു തീർത്തിട്ടുണ്ട്.`;
+        } else {
+          aiResponseText = `${matchedPerson.name}ന് നിലവിൽ കുടിശ്ശികയൊന്നുമില്ല.`;
+        }
       } else {
         const totalDue = (dues || [])
           .filter((d) => d.status !== 'PAID')
           .reduce((sum, d) => sum + Number(d.current_amount), 0);
-        aiResponseText = `ഈ മാസത്തെ ആകെ വരാനുള്ള കുടിശ്ശിക ₹${totalDue} ആണ്. കൂടുതൽ വിവരങ്ങൾക്ക് ആളുടെ പേര് പറയൂ.`;
+        aiResponseText = `ഈ മാസത്തെ ആകെ കുടിശ്ശിക തുക ₹${totalDue} ആണ്. നിർദ്ദിഷ്ട ആളുടെ വിവരം അറിയാൻ പേര് പറയൂ.`;
       }
     }
 
@@ -185,6 +240,7 @@ Instructions:
       response: aiResponseText,
       actionTaken,
       actionDetails,
+      matchedPerson: matchedPerson ? matchedPerson.name : null,
     });
   } catch (err: any) {
     console.error('AI Assistant API Error:', err);

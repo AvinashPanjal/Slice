@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface AIAssistantModalProps {
@@ -19,12 +19,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'LIVE' | 'SPEAKING' | 'LISTENING'>('DISCONNECTED');
   const [transcript, setTranscript] = useState<string>('തത്സമയ മലയാളം വോയ്‌സ് കോളിലേക്ക് സ്വാഗതം! "സ്റ്റാർട്ട് കോൾ" ക്ലിക്ക് ചെയ്യൂ.');
   const [lastAction, setLastAction] = useState<{ title: string; details: string } | null>(null);
-  const [speakerTested, setSpeakerTested] = useState(false);
+  const [matchedPersonName, setMatchedPersonName] = useState<string | null>(null);
 
+  const isCallActiveRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    isCallActiveRef.current = isCallActive;
+  }, [isCallActive]);
 
   // Stop call on modal close
   useEffect(() => {
@@ -43,18 +48,17 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
         await audioCtxRef.current.resume();
       }
 
-      // Play subtle welcome chime sound to unlock speakers
+      // Soft audio chime to unlock speaker output
       const osc = audioCtxRef.current.createOscillator();
       const gain = audioCtxRef.current.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, audioCtxRef.current.currentTime); // C5 note
-      gain.gain.setValueAtTime(0.1, audioCtxRef.current.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.3);
+      osc.frequency.setValueAtTime(523.25, audioCtxRef.current.currentTime);
+      gain.gain.setValueAtTime(0.08, audioCtxRef.current.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.25);
       osc.connect(gain);
       gain.connect(audioCtxRef.current.destination);
       osc.start();
-      osc.stop(audioCtxRef.current.currentTime + 0.3);
-      setSpeakerTested(true);
+      osc.stop(audioCtxRef.current.currentTime + 0.25);
     } catch (e) {
       console.error('Failed to unlock audio context:', e);
     }
@@ -65,15 +69,16 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
       await unlockAudioContext();
       setConnectionStatus('CONNECTING');
       setIsCallActive(true);
+      isCallActiveRef.current = true;
       setTranscript('ഗൂഗിൾ AI ലൈവ് സിസ്റ്റവുമായി കണക്ട് ചെയ്യുന്നു...');
 
       const apiKey = localStorage.getItem('gemini_api_key') || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
-      // Test Malayalam Speech Output immediately
+      // Welcome voice greeting
       const initialGreeting = 'നമസ്കാരം! ഞാൻ LendWise AI ആണ്. സംസാരിക്കൂ.';
       speakResponseMalayalam(initialGreeting);
 
-      // Check if WebSocket BidiGenerateContent is available with key
+      // Check if Gemini Live WebSocket is available
       if (apiKey && typeof window !== 'undefined' && 'WebSocket' in window) {
         const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
@@ -84,9 +89,8 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
           ws.onopen = () => {
             console.log('Gemini Live API WebSocket Connected');
             setConnectionStatus('LIVE');
-            setTranscript('Gemini Live കണക്റ്റഡ്! സംസാരിക്കാം (e.g. "ആബിൻ 100 രൂപ നൽകി").');
+            setTranscript('Gemini Live കണക്റ്റഡ്! തുടർച്ചയായി സംസാരിക്കാം.');
 
-            // Send Handshake Setup Message
             const setupMessage = {
               setup: {
                 model: 'models/gemini-2.0-flash-exp',
@@ -103,8 +107,8 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
                     {
                       text: `You are LendWise Real-Time Malayalam Voice AI Assistant. You converse with the user via live bidirectional audio in fluent Malayalam.
 The user speaks to you in Malayalam or Manglish.
-You have tools to record payments (e.g. Abin paid 100 rs) and query monthly dues.
-When an action is taken, confirm it clearly in Malayalam speech. Keep spoken answers concise and clear under 2 sentences.`,
+When asked about a specific person (e.g. Abin), give THAT person's due only.
+When an action is taken (e.g. Abin 100 rs paid), confirm it clearly in short Malayalam speech under 2 sentences.`,
                     },
                   ],
                 },
@@ -157,6 +161,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       console.error('Failed to start Live Audio Call:', err);
       setConnectionStatus('DISCONNECTED');
       setIsCallActive(false);
+      isCallActiveRef.current = false;
     }
   };
 
@@ -237,12 +242,13 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
     }
   };
 
-  // Fallback to Web Speech API + SpeechSynthesis
+  // Continuous Web Speech Stream with Auto-Restart Loop
   const fallbackToWebSpeech = () => {
     if (typeof window === 'undefined' || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setTranscript('ശബ്ദ സന്ദേശം പിന്തുണയ്ക്കുന്നില്ല. ബ്രൗസർ അപ്ഡേറ്റ് ചെയ്യുക.');
       setConnectionStatus('DISCONNECTED');
       setIsCallActive(false);
+      isCallActiveRef.current = false;
       return;
     }
 
@@ -277,6 +283,9 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
           });
 
           const data = await res.json();
+          if (data.matchedPerson) {
+            setMatchedPersonName(data.matchedPerson);
+          }
           if (data.response) {
             setTranscript(data.response);
             speakResponseMalayalam(data.response);
@@ -295,11 +304,28 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       }
     };
 
+    // Auto-restart recognition loop so it NEVER turns off after 1st chat turn
+    recognition.onend = () => {
+      console.log('Speech recognition paused/ended. Auto restarting continuous loop...');
+      if (isCallActiveRef.current && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          setConnectionStatus('LISTENING');
+        } catch (e) {
+          // Already active
+        }
+      }
+    };
+
     recognition.onerror = (err: any) => {
       console.error('Speech recognition error:', err);
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Error starting recognition:', e);
+    }
   };
 
   const speakResponseMalayalam = (text: string) => {
@@ -322,8 +348,18 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
 
+      utterance.onstart = () => {
+        setConnectionStatus('SPEAKING');
+      };
+
       utterance.onend = () => {
         setConnectionStatus('LISTENING');
+        // Restart speech recognition if ended
+        if (isCallActiveRef.current && recognitionRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (e) {}
+        }
       };
 
       window.speechSynthesis.speak(utterance);
@@ -365,6 +401,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
   };
 
   const endCall = () => {
+    isCallActiveRef.current = false;
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -378,6 +415,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       audioCtxRef.current = null;
     }
     if (recognitionRef.current) {
+      recognitionRef.current.onend = null;
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
@@ -386,6 +424,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
     }
     setIsCallActive(false);
     setConnectionStatus('DISCONNECTED');
+    setMatchedPersonName(null);
     setTranscript('കോൾ അവസാനിച്ചു.');
   };
 
@@ -397,14 +436,14 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       <div className="fixed inset-0 bg-black/90 backdrop-blur-xl" onClick={onClose} />
 
       {/* Gemini Live Call Modal Container */}
-      <div className="relative w-full max-w-md bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-6 text-white shadow-2xl z-10 flex flex-col items-center justify-between min-h-[520px]">
+      <div className="relative w-full max-w-md bg-[#050505] border border-zinc-800 rounded-[2.5rem] p-6 text-white shadow-2xl z-10 flex flex-col items-center justify-between min-h-[530px]">
         {/* Top Header Controls */}
         <div className="w-full flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${isCallActive ? 'bg-emerald-500 animate-ping' : 'bg-zinc-600'}`} />
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
               {connectionStatus === 'LIVE' || connectionStatus === 'LISTENING'
-                ? '🎙️ LIVE MALAYALAM VOICE'
+                ? '🎙️ LIVE (CONTINUOUS VOICE)'
                 : connectionStatus === 'SPEAKING'
                 ? '🔊 GEMINI SPEAKING...'
                 : connectionStatus === 'CONNECTING'
@@ -422,7 +461,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
         </div>
 
         {/* Central Audio Orb / Visualizer */}
-        <div className="my-8 flex flex-col items-center justify-center relative">
+        <div className="my-6 flex flex-col items-center justify-center relative">
           {/* Animated Pulsing Rings */}
           {isCallActive && (
             <>
@@ -449,27 +488,24 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
             )}
           </div>
 
-          <h3 className="mt-6 text-xl font-black tracking-tight text-center">
+          <h3 className="mt-5 text-xl font-black tracking-tight text-center">
             {isCallActive ? 'LendWise Gemini Live' : 'Google AI Live Stream'}
           </h3>
-          <p className="text-xs text-zinc-400 mt-1">Real-time Malayalam Voice Conversation</p>
+          <p className="text-xs text-zinc-400 mt-1">Hands-Free Continuous Malayalam Call</p>
+
+          {/* Person Matched Live Chip */}
+          {matchedPersonName && (
+            <div className="mt-2.5 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center space-x-1.5 animate-pulse">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>വ്യക്തി: {matchedPersonName}</span>
+            </div>
+          )}
         </div>
 
         {/* Realtime Live Transcript Box */}
         <div className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 text-center text-xs leading-relaxed min-h-[70px] flex items-center justify-center shadow-inner">
           <p className="text-zinc-200 font-medium">{transcript}</p>
         </div>
-
-        {/* Test Speaker Audio Button */}
-        {isCallActive && (
-          <button
-            onClick={() => speakResponseMalayalam('ശബ്ദം വ്യക്തമായി കേൾക്കാമോ?')}
-            className="mt-2 text-[10px] text-indigo-400 flex items-center space-x-1 hover:underline"
-          >
-            <Volume2 className="w-3 h-3" />
-            <span>Test Audio Output (ശബ്ദം ടെസ്റ്റ് ചെയ്യൂ)</span>
-          </button>
-        )}
 
         {/* Action Executed Banner */}
         {lastAction && (
@@ -483,7 +519,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
         )}
 
         {/* Bottom Call Action Buttons */}
-        <div className="w-full pt-6 flex items-center justify-center space-x-4">
+        <div className="w-full pt-5 flex items-center justify-center space-x-4">
           {!isCallActive ? (
             <button
               onClick={startCall}
