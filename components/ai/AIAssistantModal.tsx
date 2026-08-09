@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Sparkles, X, Volume2, CheckCircle2, Bot, PhoneCall, Radio, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface AIAssistantModalProps {
@@ -19,28 +19,61 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
   const [connectionStatus, setConnectionStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'LIVE' | 'SPEAKING' | 'LISTENING'>('DISCONNECTED');
   const [transcript, setTranscript] = useState<string>('തത്സമയ മലയാളം വോയ്‌സ് കോളിലേക്ക് സ്വാഗതം! "സ്റ്റാർട്ട് കോൾ" ക്ലിക്ക് ചെയ്യൂ.');
   const [lastAction, setLastAction] = useState<{ title: string; details: string } | null>(null);
+  const [speakerTested, setSpeakerTested] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Initialize Audio & Speech Systems
+  // Stop call on modal close
   useEffect(() => {
     if (!isOpen) {
       endCall();
     }
   }, [isOpen]);
 
+  // Ensure AudioContext is unlocked by user gesture
+  const unlockAudioContext = async () => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        await audioCtxRef.current.resume();
+      }
+
+      // Play subtle welcome chime sound to unlock speakers
+      const osc = audioCtxRef.current.createOscillator();
+      const gain = audioCtxRef.current.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(523.25, audioCtxRef.current.currentTime); // C5 note
+      gain.gain.setValueAtTime(0.1, audioCtxRef.current.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.3);
+      osc.connect(gain);
+      gain.connect(audioCtxRef.current.destination);
+      osc.start();
+      osc.stop(audioCtxRef.current.currentTime + 0.3);
+      setSpeakerTested(true);
+    } catch (e) {
+      console.error('Failed to unlock audio context:', e);
+    }
+  };
+
   const startCall = async () => {
     try {
+      await unlockAudioContext();
       setConnectionStatus('CONNECTING');
       setIsCallActive(true);
-      setTranscript('ഗൂഗിൾ AI ലൈവ് API-യുമായി കണക്ട് ചെയ്യുന്നു...');
+      setTranscript('ഗൂഗിൾ AI ലൈവ് സിസ്റ്റവുമായി കണക്ട് ചെയ്യുന്നു...');
 
       const apiKey = localStorage.getItem('gemini_api_key') || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
-      // Check if WebSocket BidiGenerateContent is supported
+      // Test Malayalam Speech Output immediately
+      const initialGreeting = 'നമസ്കാരം! ഞാൻ LendWise AI ആണ്. സംസാരിക്കൂ.';
+      speakResponseMalayalam(initialGreeting);
+
+      // Check if WebSocket BidiGenerateContent is available with key
       if (apiKey && typeof window !== 'undefined' && 'WebSocket' in window) {
         const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
@@ -51,7 +84,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({
           ws.onopen = () => {
             console.log('Gemini Live API WebSocket Connected');
             setConnectionStatus('LIVE');
-            setTranscript('Gemini Live കണക്റ്റഡ്! മലയാളത്തിൽ പറയൂ (e.g., "ആബിൻ 100 രൂപ നൽകി").');
+            setTranscript('Gemini Live കണക്റ്റഡ്! സംസാരിക്കാം (e.g. "ആബിൻ 100 രൂപ നൽകി").');
 
             // Send Handshake Setup Message
             const setupMessage = {
@@ -78,8 +111,6 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
               },
             };
             ws.send(JSON.stringify(setupMessage));
-
-            // Start Audio Capture Stream
             startMicrophoneStream(ws);
           };
 
@@ -87,7 +118,6 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
             try {
               const data = JSON.parse(event.data);
               
-              // Handle Live Server Audio Output
               if (data.serverContent?.modelTurn?.parts) {
                 for (const part of data.serverContent.modelTurn.parts) {
                   if (part.text) {
@@ -100,7 +130,6 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
                 }
               }
 
-              // Handle Function Calls (Tool Execution)
               if (data.toolCall) {
                 handleFunctionCall(data.toolCall, ws);
               }
@@ -110,7 +139,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
           };
 
           ws.onerror = (err) => {
-            console.warn('Gemini Live WebSocket error, switching to Web Speech Realtime Stream:', err);
+            console.warn('Gemini Live WebSocket error, using Web Speech Stream:', err);
             fallbackToWebSpeech();
           };
 
@@ -137,9 +166,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      audioCtxRef.current = audioCtx;
-
+      const audioCtx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const source = audioCtx.createMediaStreamSource(stream);
       const processor = audioCtx.createScriptProcessor(2048, 1, 1);
 
@@ -147,14 +174,12 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
         if (ws.readyState !== WebSocket.OPEN) return;
 
         const inputData = e.inputBuffer.getChannelData(0);
-        // Convert Float32 to Int16 PCM
         const pcm16 = new Int16Array(inputData.length);
         for (let i = 0; i < inputData.length; i++) {
           const s = Math.max(-1, Math.min(1, inputData[i]));
           pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
 
-        // Send base64 PCM chunk
         const base64Pcm = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
         ws.send(
           JSON.stringify({
@@ -180,8 +205,9 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
   };
 
   // Playback PCM Audio from Gemini Live API
-  const playPcmAudio = (base64Pcm: string) => {
+  const playPcmAudio = async (base64Pcm: string) => {
     try {
+      await unlockAudioContext();
       const binaryStr = atob(base64Pcm);
       const len = binaryStr.length;
       const bytes = new Uint8Array(len);
@@ -211,7 +237,7 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
     }
   };
 
-  // Fallback to Web Speech API + Gemini REST Backend for seamless audio streaming
+  // Fallback to Web Speech API + SpeechSynthesis
   const fallbackToWebSpeech = () => {
     if (typeof window === 'undefined' || !('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       setTranscript('ശബ്ദ സന്ദേശം പിന്തുണയ്ക്കുന്നില്ല. ബ്രൗസർ അപ്ഡേറ്റ് ചെയ്യുക.');
@@ -235,10 +261,9 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
       const spokenText = event.results[lastIndex][0].transcript;
 
       if (spokenText && spokenText.trim()) {
-        setTranscript(`താങ്കൾ പറഞ്ഞത്: "${spokenText}"`);
+        setTranscript(`കേട്ടത്: "${spokenText}"`);
         setConnectionStatus('SPEAKING');
 
-        // Call backend tool execution route
         try {
           const storedApiKey = localStorage.getItem('gemini_api_key') || '';
           const res = await fetch('/api/ai-assistant', {
@@ -280,13 +305,22 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
   const speakResponseMalayalam = (text: string) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ml-IN';
-      utterance.rate = 0.95;
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
 
+      const utterance = new SpeechSynthesisUtterance(text);
+      
       const voices = window.speechSynthesis.getVoices();
-      const mlVoice = voices.find((v) => v.lang.includes('ml') || v.name.toLowerCase().includes('malayalam'));
+      const mlVoice =
+        voices.find((v) => v.lang.toLowerCase().includes('ml') || v.name.toLowerCase().includes('malayalam')) ||
+        voices.find((v) => v.lang.toLowerCase().includes('hi')) ||
+        voices.find((v) => v.lang.toLowerCase().includes('en-in')) ||
+        voices[0];
+
       if (mlVoice) utterance.voice = mlVoice;
+      utterance.lang = mlVoice?.lang || 'en-IN';
+      utterance.volume = 1.0;
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
 
       utterance.onend = () => {
         setConnectionStatus('LISTENING');
@@ -313,7 +347,6 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
         onDataRefresh();
       }
 
-      // Return Tool Response to Gemini WebSocket
       ws.send(
         JSON.stringify({
           toolResponse: {
@@ -426,6 +459,17 @@ When an action is taken, confirm it clearly in Malayalam speech. Keep spoken ans
         <div className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 text-center text-xs leading-relaxed min-h-[70px] flex items-center justify-center shadow-inner">
           <p className="text-zinc-200 font-medium">{transcript}</p>
         </div>
+
+        {/* Test Speaker Audio Button */}
+        {isCallActive && (
+          <button
+            onClick={() => speakResponseMalayalam('ശബ്ദം വ്യക്തമായി കേൾക്കാമോ?')}
+            className="mt-2 text-[10px] text-indigo-400 flex items-center space-x-1 hover:underline"
+          >
+            <Volume2 className="w-3 h-3" />
+            <span>Test Audio Output (ശബ്ദം ടെസ്റ്റ് ചെയ്യൂ)</span>
+          </button>
+        )}
 
         {/* Action Executed Banner */}
         {lastAction && (
