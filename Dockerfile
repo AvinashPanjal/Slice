@@ -19,11 +19,11 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --only=production
+RUN npm install
 
 COPY . .
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "--max-old-space-size=256", "worker.js"]
+CMD ["npx", "tsx", "--max-old-space-size=256", "lib/whatsapp/bot-worker.ts"]
