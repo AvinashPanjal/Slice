@@ -3,7 +3,10 @@ import type { Person, MonthlyDue } from '../types';
 
 export function getReadOnlySupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+              process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
   if (!url || !key) {
     console.warn('⚠️ Supabase credentials missing from environment variables.');
     return null;
@@ -42,27 +45,27 @@ export async function getBorrowerDueByPhone(rawPhone: string): Promise<BorrowerF
   const targetDigits = normalizePhoneNumber(rawPhone);
   if (!targetDigits) return null;
 
-  // 1. Fetch active Person records (READ-ONLY)
+  // 1. Fetch active Person records from 'people' table (READ-ONLY)
   const { data: people, error: personError } = await supabase
-    .from('person')
+    .from('people')
     .select('*')
     .eq('is_archived', false);
 
   if (personError || !people) {
-    console.error('Error fetching person records:', personError);
+    console.error('Error fetching people records:', personError);
     return null;
   }
 
   // Match by normalized 10-digit phone
-  const person = people.find(p => normalizePhoneNumber(p.phone) === targetDigits);
+  const person = people.find((p: Person) => normalizePhoneNumber(p.phone) === targetDigits);
   if (!person) {
     return null;
   }
 
-  // 2. Fetch active monthly dues for this person (READ-ONLY)
+  // 2. Fetch active monthly dues for this person from 'monthly_dues' table (READ-ONLY)
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   const { data: dues, error: dueError } = await supabase
-    .from('monthly_due')
+    .from('monthly_dues')
     .select('*')
     .eq('person_id', person.id)
     .in('status', ['UPCOMING', 'PENDING', 'PARTIALLY_PAID', 'OVERDUE']);
@@ -72,7 +75,7 @@ export async function getBorrowerDueByPhone(rawPhone: string): Promise<BorrowerF
   }
 
   const activeDues = dues || [];
-  const currentDue = activeDues.find(d => d.due_month === currentMonth) || activeDues[0] || null;
+  const currentDue = activeDues.find((d: MonthlyDue) => d.due_month === currentMonth) || activeDues[0] || null;
 
   const dueAmount = currentDue ? Number(currentDue.original_amount || 0) : 0;
   const currentAmount = currentDue ? Number(currentDue.current_amount || 0) : 0;
@@ -98,10 +101,10 @@ export async function getAllDueBorrowers(): Promise<BorrowerFinancialDetails[]> 
 
   const currentMonth = new Date().toISOString().slice(0, 7);
   
-  // READ-ONLY SELECT
+  // READ-ONLY SELECT from 'monthly_dues' table joined with 'people'
   const { data: dues, error } = await supabase
-    .from('monthly_due')
-    .select('*, person(*)')
+    .from('monthly_dues')
+    .select('*, people(*)')
     .in('status', ['UPCOMING', 'PENDING', 'PARTIALLY_PAID', 'OVERDUE']);
 
   if (error || !dues) {
@@ -111,11 +114,12 @@ export async function getAllDueBorrowers(): Promise<BorrowerFinancialDetails[]> 
 
   const results: BorrowerFinancialDetails[] = [];
   for (const due of dues) {
-    if (due.person && !due.person.is_archived) {
+    const person = due.people || due.person;
+    if (person && !person.is_archived) {
       const dueAmount = Number(due.original_amount || 0);
       const currentAmount = Number(due.current_amount || 0);
       results.push({
-        person: due.person,
+        person,
         currentDue: due,
         totalDueAmount: dueAmount,
         totalPaidAmount: Math.max(0, dueAmount - currentAmount),
