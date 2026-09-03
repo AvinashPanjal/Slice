@@ -87,9 +87,14 @@ client.on('auth_failure', (msg) => {
   botStatus = `Auth Failure: ${msg}`;
 });
 
-client.on('disconnected', (reason) => {
+client.on('disconnected', async (reason) => {
   console.log('⚠️ WhatsApp Client disconnected:', reason);
   botStatus = `Disconnected: ${reason}`;
+  try {
+    await client.destroy();
+  } catch (e) {
+    // Ignore OS file lock errors on cleanup
+  }
 });
 
 // Helper function to send WhatsApp text to a given phone number
