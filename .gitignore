@@ -1,6 +1,8 @@
 # LendWise - Supabase + Next.js
 .env.local
 .env
+.wwebjs_auth/
+.wwebjs_cache/
 
 # Next.js
 .next/
