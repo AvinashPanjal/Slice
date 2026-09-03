@@ -123,11 +123,12 @@ async function handleIncomingMessage(msg: any, isSelf: boolean) {
     if (isGroup && !prefix && process.env.ALLOW_GROUPS !== 'true') return;
 
     let senderPhone = process.env.TEST_PHONE_NUMBER || '+916238851129';
+    const isTestMode = process.env.TEST_MODE !== 'false';
 
-    if (!isSelf) {
+    if (!isSelf && !isTestMode) {
       try {
         const contact = await msg.getContact();
-        if (contact && contact.number) {
+        if (contact && contact.number && !contact.number.startsWith('66')) {
           senderPhone = contact.number;
         } else if (msg.from && !msg.from.endsWith('@lid')) {
           senderPhone = msg.from;

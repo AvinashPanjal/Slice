@@ -64,9 +64,10 @@ A contact with phone number ${senderPhone} sent a message: "${userMessage}"
 However, their phone number is NOT listed in the active borrower database.
 
 INSTRUCTIONS:
-1. Politely inform them that their phone number (${senderPhone}) is not registered in our Lendwise borrower records.
-2. Provide Avinash's contact info or ask them to confirm if they are messaging from a different registered mobile number.
-3. Keep response concise, friendly, and helpful for chat.
+1. Politely inform them that their phone number is not registered in our Lendwise borrower records.
+2. Ask them to confirm if they are messaging from a different mobile number or to reach out to Avinash directly.
+3. DO NOT invent or mention any fictional email addresses (like support@lendwise.com) or websites. Keep responses strictly factual.
+4. Keep response concise, friendly, and helpful for chat.
 `;
     }
 
