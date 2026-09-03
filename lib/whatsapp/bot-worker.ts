@@ -18,7 +18,7 @@ let currentQr: string | null = null;
 let botStatus = 'Initializing...';
 let qrImageSrc: string | null = null;
 
-// Configure low-memory Puppeteer Chrome flags
+// Configure Puppeteer options for container environments (Render/Railway/Docker)
 const puppeteerArgs = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -27,16 +27,6 @@ const puppeteerArgs = [
   '--disable-gpu',
   '--disable-software-rasterizer',
   '--disable-extensions',
-  '--disable-background-networking',
-  '--disable-background-timer-throttling',
-  '--disable-backgrounding-occluded-windows',
-  '--disable-breakpad',
-  '--disable-component-update',
-  '--disable-default-apps',
-  '--disable-features=Translate,BackForwardCache,MediaRouter',
-  '--disable-ipc-flooding-protection',
-  '--disable-renderer-backgrounding',
-  '--js-flags="--max-old-space-size=256"',
   '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 ];
 
@@ -192,17 +182,21 @@ app.get('/', (req, res) => {
         
         ${qrImageSrc ? `
           <div>
-            <p><strong>Scan QR code to connect WhatsApp:</strong></p>
+            <p><strong>Scan QR code with WhatsApp:</strong></p>
             <img src="${qrImageSrc}" alt="WhatsApp QR Code" />
+            <p style="font-size:0.8rem; color:#64748b; margin-top:8px;">Open WhatsApp > Linked Devices > Link a Device</p>
           </div>
         ` : `
-          <p>${isConnected ? '✅ Bot is active and listening for borrower queries.' : '⏳ Initializing WhatsApp Web Client...'}</p>
+          <p style="margin-top: 1.5rem;">${isConnected ? '✅ Bot is active and listening for borrower queries.' : '⏳ Generating QR Code, please wait standard initialization (10-30 seconds)...'}</p>
         `}
 
         <div class="footer">
           Lendwise (Slice) AI Middleware • Test Recipient: <code>${process.env.TEST_PHONE_NUMBER || '+91 6238851129'}</code>
         </div>
       </div>
+      <script>
+        ${!isConnected ? 'setTimeout(() => location.reload(), 8000);' : ''}
+      </script>
     </body>
     </html>
   `);
