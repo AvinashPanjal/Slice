@@ -31,6 +31,13 @@ export interface BorrowerFinancialDetails {
   remainingAmount: number;
   dueDate?: string;
   dueMonth?: string;
+  currentMonth: string;
+  isCurrentMonthPaid: boolean;
+  hasOverdue: boolean;
+  overdueAmount: number;
+  nextDueMonth?: string;
+  nextDueDate?: string;
+  nextDueAmount?: number;
   upiId: string;
 }
 
@@ -68,11 +75,22 @@ export async function getBorrowerDueByPhone(rawPhone: string): Promise<BorrowerF
     }
   }
 
-  // If found in database, return database record
+  // If found in database, return database record with date/month awareness
   if (person) {
-    const currentDue = activeDues.find((d: MonthlyDue) => d.due_month === currentMonth) || activeDues[0] || null;
+    const currentMonthDue = activeDues.find((d: MonthlyDue) => d.due_month === currentMonth);
+    const overdueDues = activeDues.filter((d: MonthlyDue) => d.due_month < currentMonth && Number(d.current_amount || 0) > 0);
+    const overdueAmount = overdueDues.reduce((sum, d) => sum + Number(d.current_amount || 0), 0);
+
+    const upcomingDues = activeDues
+      .filter((d: MonthlyDue) => Number(d.current_amount || 0) > 0)
+      .sort((a, b) => a.due_month.localeCompare(b.due_month));
+
+    const nextDue = upcomingDues[0] || null;
+
+    const currentDue = currentMonthDue || nextDue;
     const dueAmount = currentDue ? Number(currentDue.original_amount || 0) : 0;
     const currentAmount = currentDue ? Number(currentDue.current_amount || 0) : 0;
+    const isCurrentMonthPaid = currentMonthDue ? currentMonthDue.status === 'PAID' || Number(currentMonthDue.current_amount || 0) === 0 : true;
 
     return {
       person,
@@ -82,6 +100,13 @@ export async function getBorrowerDueByPhone(rawPhone: string): Promise<BorrowerF
       remainingAmount: currentAmount,
       dueDate: currentDue?.due_date,
       dueMonth: currentDue?.due_month || currentMonth,
+      currentMonth,
+      isCurrentMonthPaid,
+      hasOverdue: overdueAmount > 0,
+      overdueAmount,
+      nextDueMonth: nextDue?.due_month,
+      nextDueDate: nextDue?.due_date,
+      nextDueAmount: nextDue ? Number(nextDue.current_amount || 0) : 0,
       upiId: process.env.DEFAULT_UPI_ID || 'avinashpanjal5@okhdfcbank'
     };
   }
@@ -106,6 +131,13 @@ export async function getBorrowerDueByPhone(rawPhone: string): Promise<BorrowerF
       remainingAmount: 5000,
       dueDate: `${currentMonth}-05`,
       dueMonth: currentMonth,
+      currentMonth,
+      isCurrentMonthPaid: false,
+      hasOverdue: false,
+      overdueAmount: 0,
+      nextDueMonth: currentMonth,
+      nextDueDate: `${currentMonth}-05`,
+      nextDueAmount: 5000,
       upiId: process.env.DEFAULT_UPI_ID || 'avinashpanjal5@okhdfcbank'
     };
   }
@@ -141,6 +173,13 @@ export async function getAllDueBorrowers(): Promise<BorrowerFinancialDetails[]> 
             remainingAmount: currentAmount,
             dueDate: due.due_date,
             dueMonth: due.due_month || currentMonth,
+            currentMonth,
+            isCurrentMonthPaid: due.due_month === currentMonth ? (due.status === 'PAID' || currentAmount === 0) : false,
+            hasOverdue: due.due_month < currentMonth && currentAmount > 0,
+            overdueAmount: due.due_month < currentMonth ? currentAmount : 0,
+            nextDueMonth: due.due_month,
+            nextDueDate: due.due_date,
+            nextDueAmount: currentAmount,
             upiId: process.env.DEFAULT_UPI_ID || 'avinashpanjal5@okhdfcbank'
           });
         }
@@ -167,6 +206,13 @@ export async function getAllDueBorrowers(): Promise<BorrowerFinancialDetails[]> 
       remainingAmount: 5000,
       dueDate: `${currentMonth}-05`,
       dueMonth: currentMonth,
+      currentMonth,
+      isCurrentMonthPaid: false,
+      hasOverdue: false,
+      overdueAmount: 0,
+      nextDueMonth: currentMonth,
+      nextDueDate: `${currentMonth}-05`,
+      nextDueAmount: 5000,
       upiId: process.env.DEFAULT_UPI_ID || 'avinashpanjal5@okhdfcbank'
     });
   }
