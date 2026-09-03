@@ -122,9 +122,24 @@ async function handleIncomingMessage(msg: any, isSelf: boolean) {
     const isGroup = msg.from.endsWith('@g.us');
     if (isGroup && !prefix && process.env.ALLOW_GROUPS !== 'true') return;
 
-    const senderPhone = isSelf ? (process.env.TEST_PHONE_NUMBER || '+916238851129') : msg.from;
+    let senderPhone = process.env.TEST_PHONE_NUMBER || '+916238851129';
 
-    console.log(`📩 INCOMING BORROWER QUERY [${isSelf ? 'Self Test' : senderPhone}]: "${userPrompt}"`);
+    if (!isSelf) {
+      try {
+        const contact = await msg.getContact();
+        if (contact && contact.number) {
+          senderPhone = contact.number;
+        } else if (msg.from && !msg.from.endsWith('@lid')) {
+          senderPhone = msg.from;
+        }
+      } catch (e) {
+        if (msg.from && !msg.from.endsWith('@lid')) {
+          senderPhone = msg.from;
+        }
+      }
+    }
+
+    console.log(`📩 INCOMING BORROWER QUERY [Sender: ${senderPhone} (Raw: ${msg.from})]: "${userPrompt}"`);
 
     // Process query using Gemini AI middleware + Supabase READ-ONLY lookup
     const aiReply = await handleBorrowerAIQuery(senderPhone, userPrompt);
