@@ -1,5 +1,6 @@
 import express from 'express';
 import QRCode from 'qrcode';
+// @ts-ignore
 import qrcodeTerminal from 'qrcode-terminal';
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
