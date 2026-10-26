@@ -10,10 +10,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Loan, Person, LoanSource, PaymentAllocation, Adjustment, MonthlyDue } from '@/lib/types';
 import { calculateLoanRemaining, calculateTotalBorrowed, calculateTotalPaid } from '@/lib/calculations';
 import { formatINR } from '@/lib/utils/currency';
-import { formatDateDisplay } from '@/lib/utils/date';
+import { formatDateDisplay, formatMonthDisplay } from '@/lib/utils/date';
 import { LoanFormModal } from '@/components/loans/LoanFormModal';
 import { MonthlyDuesScheduleModal } from '@/components/dues/MonthlyDuesScheduleModal';
-import { CreditCard, Plus, Filter, User, UserCheck, Trash2, Calendar } from 'lucide-react';
+import { CreditCard, Plus, Filter, User, UserCheck, Trash2, Calendar, X, CalendarRange } from 'lucide-react';
 
 export default function LoansPage() {
   const supabase = createClient();
@@ -29,6 +29,11 @@ export default function LoansPage() {
   // Filter & Sort
   const [borrowerTypeFilter, setBorrowerTypeFilter] = useState<'ALL' | 'PERSON' | 'MYSELF'>('ALL');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
+  const [dateFilterMode, setDateFilterMode] = useState<'EXACT' | 'RANGE' | 'MONTH' | 'ALL'>('EXACT');
+  const [exactDate, setExactDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   // Modal State
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
@@ -91,9 +96,48 @@ export default function LoansPage() {
     }
   };
 
+  const getLoanDatePart = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    return dateStr.split('T')[0].split(' ')[0].trim();
+  };
+
+  const isDateFilterActive =
+    (dateFilterMode === 'EXACT' && !!exactDate) ||
+    (dateFilterMode === 'RANGE' && (!!startDate || !!endDate)) ||
+    (dateFilterMode === 'MONTH' && !!selectedMonth);
+
+  const isAnyFilterActive =
+    borrowerTypeFilter !== 'ALL' ||
+    sourceFilter !== 'ALL' ||
+    isDateFilterActive;
+
+  const handleResetFilters = () => {
+    setBorrowerTypeFilter('ALL');
+    setSourceFilter('ALL');
+    setExactDate('');
+    setStartDate('');
+    setEndDate('');
+    setSelectedMonth('');
+  };
+
   const filteredLoans = loans.filter((loan) => {
     if (borrowerTypeFilter !== 'ALL' && loan.borrower_type !== borrowerTypeFilter) return false;
     if (sourceFilter !== 'ALL' && loan.loan_source_id !== sourceFilter) return false;
+
+    if (isDateFilterActive) {
+      const loanDate = getLoanDatePart(loan.taken_date);
+      if (!loanDate) return false;
+
+      if (dateFilterMode === 'EXACT' && exactDate) {
+        if (loanDate !== exactDate) return false;
+      } else if (dateFilterMode === 'RANGE') {
+        if (startDate && loanDate < startDate) return false;
+        if (endDate && loanDate > endDate) return false;
+      } else if (dateFilterMode === 'MONTH' && selectedMonth) {
+        if (!loanDate.startsWith(selectedMonth)) return false;
+      }
+    }
+
     return true;
   });
 
@@ -131,47 +175,212 @@ export default function LoansPage() {
       </div>
 
       {/* Filter Bar */}
-      <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2 overflow-x-auto">
-          <select
-            className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
-            value={borrowerTypeFilter}
-            onChange={(e: any) => setBorrowerTypeFilter(e.target.value)}
-          >
-            <option value="ALL">All Borrowers (Person & Myself)</option>
-            <option value="PERSON">Friend / Person Loans</option>
-            <option value="MYSELF">Money Taken for Myself</option>
-          </select>
+      <Card className="p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Main Filter Group */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Borrower Filter */}
+            <select
+              aria-label="Filter by borrower"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+              value={borrowerTypeFilter}
+              onChange={(e: any) => setBorrowerTypeFilter(e.target.value)}
+            >
+              <option value="ALL">All Borrowers (Person & Myself)</option>
+              <option value="PERSON">Friend / Person Loans</option>
+              <option value="MYSELF">Money Taken for Myself</option>
+            </select>
 
-          <select
-            className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-          >
-            <option value="ALL">All Loan Sources</option>
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+            {/* Loan Source Filter */}
+            <select
+              aria-label="Filter by loan source"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+            >
+              <option value="ALL">All Loan Sources</option>
+              {sources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Date Filter Mode Selector */}
+            <select
+              aria-label="Filter by date option"
+              className="rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs font-semibold focus:outline-none dark:bg-[#131b2e] dark:text-white"
+              value={dateFilterMode}
+              onChange={(e: any) => {
+                const mode = e.target.value;
+                setDateFilterMode(mode);
+                if (mode === 'ALL') {
+                  setExactDate('');
+                  setStartDate('');
+                  setEndDate('');
+                  setSelectedMonth('');
+                }
+              }}
+            >
+              <option value="EXACT">📅 Specific Taking Date</option>
+              <option value="RANGE">📅 Taking Date Range</option>
+              <option value="MONTH">📅 Taking Month</option>
+              <option value="ALL">📅 Date Filter: Off</option>
+            </select>
+
+            {/* Exact Taking Date Input */}
+            {dateFilterMode === 'EXACT' && (
+              <div className="flex items-center space-x-1.5 bg-slate-50 dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-xs text-slate-500 font-medium shrink-0">Taking Date:</span>
+                <input
+                  type="date"
+                  aria-label="Filter by loan taking date"
+                  className="bg-transparent text-xs font-semibold focus:outline-none dark:text-white dark:[color-scheme:dark] cursor-pointer"
+                  value={exactDate}
+                  onChange={(e) => setExactDate(e.target.value)}
+                />
+                {exactDate && (
+                  <button
+                    onClick={() => setExactDate('')}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded-full"
+                    title="Clear date filter"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Taking Date Range Inputs */}
+            {dateFilterMode === 'RANGE' && (
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
+                <CalendarRange className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-[11px] text-slate-400 font-semibold uppercase">From</span>
+                <input
+                  type="date"
+                  aria-label="Filter from taking date"
+                  className="bg-transparent text-xs font-semibold focus:outline-none dark:text-white dark:[color-scheme:dark] cursor-pointer"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+                <span className="text-[11px] text-slate-400 font-semibold uppercase">To</span>
+                <input
+                  type="date"
+                  aria-label="Filter to taking date"
+                  className="bg-transparent text-xs font-semibold focus:outline-none dark:text-white dark:[color-scheme:dark] cursor-pointer"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded-full"
+                    title="Clear date range"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Taking Month Input */}
+            {dateFilterMode === 'MONTH' && (
+              <div className="flex items-center space-x-1.5 bg-slate-50 dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="text-xs text-slate-500 font-medium shrink-0">Taking Month:</span>
+                <input
+                  type="month"
+                  aria-label="Filter by loan taking month"
+                  className="bg-transparent text-xs font-semibold focus:outline-none dark:text-white dark:[color-scheme:dark] cursor-pointer"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                />
+                {selectedMonth && (
+                  <button
+                    onClick={() => setSelectedMonth('')}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5 rounded-full"
+                    title="Clear month filter"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Reset All Filters Button */}
+            {isAnyFilterActive && (
+              <button
+                onClick={handleResetFilters}
+                className="inline-flex items-center space-x-1 text-xs font-bold text-rose-500 hover:text-rose-600 dark:text-rose-400 px-2.5 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors"
+                title="Reset all filters"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Reset Filters</span>
+              </button>
+            )}
+          </div>
+
+          {/* Counts & Totals */}
+          <div className="flex items-center space-x-3 text-xs text-slate-500 font-semibold ml-auto">
+            <span>
+              Showing <strong className="text-slate-900 dark:text-white">{filteredLoans.length}</strong> of {loans.length}
+            </span>
+            <span>•</span>
+            <span>
+              Filtered Total: <span className="font-extrabold text-slate-900 dark:text-white">{formatINR(totalOriginal)}</span>
+            </span>
+          </div>
         </div>
 
-        <div className="text-xs text-slate-500 font-semibold">
-          Filtered Total: <span className="font-extrabold text-slate-900 dark:text-white">{formatINR(totalOriginal)}</span>
-        </div>
+        {/* Active Date Filter Indicator Banner */}
+        {isDateFilterActive && (
+          <div className="flex items-center justify-between text-xs py-1.5 px-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-900/40 rounded-xl text-indigo-700 dark:text-indigo-300">
+            <span className="font-medium">
+              Filtered by Taking Date:{' '}
+              <strong className="font-bold">
+                {dateFilterMode === 'EXACT' && exactDate && formatDateDisplay(exactDate)}
+                {dateFilterMode === 'RANGE' &&
+                  `${startDate ? formatDateDisplay(startDate) : 'Beginning'} → ${endDate ? formatDateDisplay(endDate) : 'Present'}`}
+                {dateFilterMode === 'MONTH' && selectedMonth && formatMonthDisplay(selectedMonth)}
+              </strong>
+            </span>
+            <button
+              onClick={() => {
+                setExactDate('');
+                setStartDate('');
+                setEndDate('');
+                setSelectedMonth('');
+              }}
+              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+            >
+              Clear Date Filter
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* Loans Grid */}
       {filteredLoans.length === 0 ? (
         <EmptyState
           icon={<CreditCard className="w-6 h-6 text-slate-400" />}
-          title="No Loans Found"
-          description="Create your first loan record to begin tracking dues."
-          actionLabel="Record Loan"
+          title={loans.length === 0 ? 'No Loans Found' : 'No Loans Match Filters'}
+          description={
+            loans.length === 0
+              ? 'Create your first loan record to begin tracking dues.'
+              : 'No loan records match your selected date or borrower criteria.'
+          }
+          actionLabel={loans.length === 0 ? 'Record Loan' : 'Reset Filters'}
           onAction={() => {
-            setEditingLoan(null);
-            setIsLoanModalOpen(true);
+            if (loans.length === 0) {
+              setEditingLoan(null);
+              setIsLoanModalOpen(true);
+            } else {
+              handleResetFilters();
+            }
           }}
         />
       ) : (
