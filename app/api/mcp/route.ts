@@ -227,30 +227,39 @@ export async function POST(request: Request) {
     if (method === 'tools/call') {
       const toolName = params?.name;
       const toolArgs = params?.arguments || {};
+      const url = new URL(request.url);
+      const dynamicSupabaseKey =
+        url.searchParams.get('supabase_key') ||
+        request.headers.get('x-supabase-key') ||
+        undefined;
+
       let toolResult: any = null;
 
       switch (toolName) {
         case 'get_dashboard_summary':
-          toolResult = await getDashboardSummary();
+          toolResult = await getDashboardSummary(dynamicSupabaseKey);
           break;
 
         case 'search_person_dues':
-          toolResult = await searchPerson(toolArgs.query || '');
+          toolResult = await searchPerson(toolArgs.query || '', dynamicSupabaseKey);
           break;
 
         case 'list_active_loans':
-          toolResult = await listLoans({
-            borrowerType: toolArgs.borrowerType || 'ALL',
-            status: toolArgs.status || 'ALL',
-          });
+          toolResult = await listLoans(
+            {
+              borrowerType: toolArgs.borrowerType || 'ALL',
+              status: toolArgs.status || 'ALL',
+            },
+            dynamicSupabaseKey
+          );
           break;
 
         case 'get_monthly_dues':
-          toolResult = await getMonthlyDues(toolArgs.month);
+          toolResult = await getMonthlyDues(toolArgs.month, dynamicSupabaseKey);
           break;
 
         case 'get_overdue_dues':
-          toolResult = await getOverdueDues();
+          toolResult = await getOverdueDues(dynamicSupabaseKey);
           break;
 
         default:

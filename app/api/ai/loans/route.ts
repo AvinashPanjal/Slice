@@ -12,11 +12,12 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const dynamicKey = searchParams.get('supabase_key') || request.headers.get('x-supabase-key') || undefined;
     const borrowerType = (searchParams.get('type') || 'ALL') as 'ALL' | 'PERSON' | 'MYSELF';
     const status = searchParams.get('status') || 'ALL';
     const sourceId = searchParams.get('sourceId') || 'ALL';
 
-    const result = await listLoans({ borrowerType, status, sourceId });
+    const result = await listLoans({ borrowerType, status, sourceId }, dynamicKey);
 
     return NextResponse.json({
       success: true,

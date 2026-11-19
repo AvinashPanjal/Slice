@@ -12,8 +12,9 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
+    const dynamicKey = searchParams.get('supabase_key') || request.headers.get('x-supabase-key') || undefined;
     const query = searchParams.get('name') || searchParams.get('query') || searchParams.get('phone') || '';
-    const result = await searchPerson(query);
+    const result = await searchPerson(query, dynamicKey);
 
     return NextResponse.json({
       success: true,

@@ -11,7 +11,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const summary = await getDashboardSummary();
+    const { searchParams } = new URL(request.url);
+    const dynamicKey = searchParams.get('supabase_key') || request.headers.get('x-supabase-key') || undefined;
+    const summary = await getDashboardSummary(dynamicKey);
     return NextResponse.json({
       success: true,
       summary,

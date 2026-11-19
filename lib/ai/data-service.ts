@@ -16,9 +16,10 @@ import type { Person, Loan, LoanSource, MonthlyDue, PaymentAllocation, Adjustmen
  * Prioritizes SUPABASE_SERVICE_ROLE_KEY (to bypass RLS for server-side AI access),
  * falling back to NEXT_PUBLIC_SUPABASE_ANON_KEY.
  */
-function getReadOnlySupabase() {
+function getReadOnlySupabase(dynamicKey?: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const key =
+    dynamicKey ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -38,8 +39,8 @@ function getReadOnlySupabase() {
  * Fetches all necessary data from the database using strictly READ-ONLY SELECT queries.
  * NEVER performs any insert, update, delete, or schema mutations.
  */
-async function fetchReadOnlySnapshot() {
-  const supabase = getReadOnlySupabase();
+async function fetchReadOnlySnapshot(dynamicKey?: string) {
+  const supabase = getReadOnlySupabase(dynamicKey);
   if (!supabase) {
     throw new Error('Supabase configuration missing in environment variables.');
   }
@@ -76,8 +77,8 @@ async function fetchReadOnlySnapshot() {
 /**
  * 1. High-level dashboard summary (totals, monthly status, overdue).
  */
-export async function getDashboardSummary() {
-  const data = await fetchReadOnlySnapshot();
+export async function getDashboardSummary(dynamicKey?: string) {
+  const data = await fetchReadOnlySnapshot(dynamicKey);
   const currentMonthStr = getCurrentMonthStr();
   const todayStr = getTodayStr();
 
@@ -119,8 +120,8 @@ export async function getDashboardSummary() {
 /**
  * 2. Search person by name or phone and get their full financial standing.
  */
-export async function searchPerson(query: string) {
-  const data = await fetchReadOnlySnapshot();
+export async function searchPerson(query: string, dynamicKey?: string) {
+  const data = await fetchReadOnlySnapshot(dynamicKey);
   const currentMonthStr = getCurrentMonthStr();
   const todayStr = getTodayStr();
   const normalizedQuery = (query || '').toLowerCase().trim();
@@ -213,12 +214,15 @@ export async function searchPerson(query: string) {
 /**
  * 3. List all active or filtered loans.
  */
-export async function listLoans(options?: {
-  borrowerType?: 'ALL' | 'PERSON' | 'MYSELF';
-  status?: string;
-  sourceId?: string;
-}) {
-  const data = await fetchReadOnlySnapshot();
+export async function listLoans(
+  options?: {
+    borrowerType?: 'ALL' | 'PERSON' | 'MYSELF';
+    status?: string;
+    sourceId?: string;
+  },
+  dynamicKey?: string
+) {
+  const data = await fetchReadOnlySnapshot(dynamicKey);
 
   const borrowerType = options?.borrowerType || 'ALL';
   const status = options?.status || 'ALL';
@@ -268,8 +272,8 @@ export async function listLoans(options?: {
 /**
  * 4. Get monthly dues for a specific cycle (defaults to current month).
  */
-export async function getMonthlyDues(monthStr?: string) {
-  const data = await fetchReadOnlySnapshot();
+export async function getMonthlyDues(monthStr?: string, dynamicKey?: string) {
+  const data = await fetchReadOnlySnapshot(dynamicKey);
   const targetMonth = monthStr || getCurrentMonthStr();
   const todayStr = getTodayStr();
 
@@ -313,8 +317,8 @@ export async function getMonthlyDues(monthStr?: string) {
 /**
  * 5. Get all currently overdue dues and borrowers across all months.
  */
-export async function getOverdueDues() {
-  const data = await fetchReadOnlySnapshot();
+export async function getOverdueDues(dynamicKey?: string) {
+  const data = await fetchReadOnlySnapshot(dynamicKey);
   const todayStr = getTodayStr();
 
   const overdueList = data.dues
