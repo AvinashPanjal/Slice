@@ -10,10 +10,11 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Fast-path bypass for static files, manifest, sw.js, and public assets
+  // Fast-path bypass for static files, manifest, sw.js, API routes, and public assets
   const isPublicAsset =
     pathname === '/' ||
     pathname.startsWith('/pay') ||
+    pathname.startsWith('/api') ||
     pathname.startsWith('/manifest') ||
     pathname.startsWith('/sw.js') ||
     pathname.startsWith('/icons/') ||

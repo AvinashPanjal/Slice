@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { Profile, ReminderTemplate } from '@/lib/types';
-import { Settings as SettingsIcon, Save, MessageSquare, ShieldCheck, Sparkles } from 'lucide-react';
+import { Settings as SettingsIcon, Save, MessageSquare, ShieldCheck, Sparkles, Bot, Copy, Check, ExternalLink, Key, Code } from 'lucide-react';
 import { requestNotificationPermission, sendLocalNotification } from '@/lib/utils/notifications';
 
 export default function SettingsPage() {
@@ -25,6 +25,13 @@ export default function SettingsPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [notifGranted, setNotifGranted] = useState(false);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+
+  const handleCopy = (text: string, type: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedType(type);
+    setTimeout(() => setCopiedType(null), 2500);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -256,6 +263,161 @@ export default function SettingsPage() {
           </Button>
         </Card>
       </div>
+
+      {/* AI & MCP Plugin Integration Card */}
+      <Card className="p-6 space-y-6 border-l-4 border-l-purple-500">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-purple-50 dark:bg-purple-950/40 rounded-xl text-purple-600 dark:text-purple-400">
+              <Bot className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                AI & MCP Plugin Integration
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-full border border-emerald-300 dark:border-emerald-800">
+                  Strictly Read-Only
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Connect Slice to ChatGPT, Claude Desktop, Cursor, or any MCP-compatible AI to talk with your loans.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Secret Key Row */}
+        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-purple-500" />
+              Your AI Secret API Key
+            </span>
+            <span className="text-[11px] text-slate-400 font-medium">Use as Bearer token</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value="slice_sec_99a8b7c6d5e4"
+              className="flex-1 bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-700 px-3 py-2 rounded-xl text-xs font-mono text-slate-900 dark:text-white focus:outline-none select-all"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleCopy('slice_sec_99a8b7c6d5e4', 'key')}
+              className="shrink-0 text-xs font-bold"
+            >
+              {copiedType === 'key' ? <Check className="w-3.5 h-3.5 text-emerald-500 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+              {copiedType === 'key' ? 'Copied!' : 'Copy Key'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Two Integration Blocks: ChatGPT vs Claude MCP */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* 1. ChatGPT Custom GPT Actions */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  🟢 1. ChatGPT (Custom GPT)
+                </h3>
+                <span className="text-[10px] font-semibold text-slate-400">Web & Phone App</span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Talk to your website from the ChatGPT mobile app or web. Paste this OpenAPI URL when creating a Custom GPT Action:
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value="https://slice-blush-ten.vercel.app/api/ai/openapi.json"
+                  className="flex-1 bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-xl text-[11px] font-mono text-slate-800 dark:text-slate-200 focus:outline-none select-all truncate"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCopy('https://slice-blush-ten.vercel.app/api/ai/openapi.json', 'chatgpt')}
+                  className="shrink-0 text-xs font-semibold px-2.5"
+                >
+                  {copiedType === 'chatgpt' ? <Check className="w-3.5 h-3.5 text-emerald-500 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+                  {copiedType === 'chatgpt' ? 'Copied' : 'Copy URL'}
+                </Button>
+              </div>
+            </div>
+
+            <ol className="text-[11px] text-slate-500 space-y-1 list-decimal list-inside bg-white dark:bg-[#131b2e] p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+              <li>In ChatGPT, open <strong>Explore GPTs → Create</strong>.</li>
+              <li>Under <strong>Configure</strong>, click <strong>Create new action</strong>.</li>
+              <li>Click <strong>Import from URL</strong>, paste the link above.</li>
+              <li>Under <strong>Authentication</strong>, choose <strong>Bearer</strong> and paste your Secret Key.</li>
+            </ol>
+          </div>
+
+          {/* 2. Claude Desktop / Cursor MCP */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  🟣 2. Claude Desktop & Cursor (MCP)
+                </h3>
+                <span className="text-[10px] font-semibold text-slate-400">Desktop / IDEs</span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Connect Claude Desktop or Cursor to Slice via standard Model Context Protocol:
+              </p>
+              <div className="relative">
+                <pre className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl text-[10px] font-mono text-slate-800 dark:text-slate-200 overflow-x-auto max-h-24">
+{`{
+  "mcpServers": {
+    "slice": {
+      "command": "npx",
+      "args": ["-y", "tsx", "scripts/mcp-server.ts"],
+      "env": {
+        "SLICE_API_URL": "https://slice-blush-ten.vercel.app",
+        "SLICE_AI_API_KEY": "slice_sec_99a8b7c6d5e4"
+      }
+    }
+  }
+}`}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopy(
+                      JSON.stringify(
+                        {
+                          mcpServers: {
+                            slice: {
+                              command: 'npx',
+                              args: ['-y', 'tsx', 'scripts/mcp-server.ts'],
+                              env: {
+                                SLICE_API_URL: 'https://slice-blush-ten.vercel.app',
+                                SLICE_AI_API_KEY: 'slice_sec_99a8b7c6d5e4',
+                              },
+                            },
+                          },
+                        },
+                        null,
+                        2
+                      ),
+                      'mcp'
+                    )
+                  }
+                  className="absolute top-2 right-2 text-xs font-bold px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 flex items-center gap-1 border border-slate-300 dark:border-slate-600"
+                >
+                  {copiedType === 'mcp' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                  {copiedType === 'mcp' ? 'Copied' : 'Copy JSON'}
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 bg-white dark:bg-[#131b2e] p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+              💡 Or connect to the remote MCP HTTP endpoint: <code className="font-mono text-purple-600 dark:text-purple-400">https://slice-blush-ten.vercel.app/api/mcp</code>
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {/* Profile Preferences */}
       <Card className="p-6 space-y-6">

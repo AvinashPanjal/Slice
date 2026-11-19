@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "whatsapp-worker": "tsx lib/whatsapp/bot-worker.ts",
+    "mcp-server": "tsx scripts/mcp-server.ts",
     "lint": "next lint",
     "test": "vitest run"
   },
