@@ -10,6 +10,12 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key, accept',
+};
+
 const MCP_TOOLS = [
   {
     name: 'get_dashboard_summary',
@@ -79,6 +85,68 @@ const MCP_TOOLS = [
   },
 ];
 
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
+/**
+ * Handles MCP Server-Sent Events (SSE) connection handshake or status info
+ */
+export async function GET(request: Request) {
+  const auth = validateAiAuth(request);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      { error: auth.error },
+      { status: 401, headers: CORS_HEADERS }
+    );
+  }
+
+  const host = request.headers.get('host') || 'slice-blush-ten.vercel.app';
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  const url = new URL(request.url);
+  const keyParam = url.searchParams.get('key') ? `?key=${url.searchParams.get('key')}` : '';
+  const postEndpoint = `${protocol}://${host}/api/mcp${keyParam}`;
+
+  const acceptHeader = request.headers.get('accept') || '';
+
+  // MCP SSE Transport handshake
+  if (acceptHeader.includes('text/event-stream')) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`event: endpoint\ndata: ${postEndpoint}\n\n`));
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+      },
+    });
+  }
+
+  // JSON summary for regular GET
+  return NextResponse.json(
+    {
+      name: 'Slice MCP Server',
+      description: 'Model Context Protocol (MCP) server for Slice loan management.',
+      protocolVersion: '2024-11-05',
+      endpoint: postEndpoint,
+      availableTools: MCP_TOOLS.map((t) => t.name),
+    },
+    { headers: CORS_HEADERS }
+  );
+}
+
+/**
+ * Handles MCP JSON-RPC 2.0 requests
+ */
 export async function POST(request: Request) {
   const auth = validateAiAuth(request);
   if (!auth.authenticated) {
@@ -88,7 +156,7 @@ export async function POST(request: Request) {
         error: { code: -32000, message: auth.error || 'Unauthorized' },
         id: null,
       },
-      { status: 401 }
+      { status: 401, headers: CORS_HEADERS }
     );
   }
 
@@ -97,45 +165,62 @@ export async function POST(request: Request) {
     const { jsonrpc, id, method, params } = body || {};
 
     if (jsonrpc !== '2.0') {
-      return NextResponse.json({
-        jsonrpc: '2.0',
-        error: { code: -32600, message: 'Invalid Request: jsonrpc must be "2.0"' },
-        id: id || null,
-      });
+      return NextResponse.json(
+        {
+          jsonrpc: '2.0',
+          error: { code: -32600, message: 'Invalid Request: jsonrpc must be "2.0"' },
+          id: id || null,
+        },
+        { headers: CORS_HEADERS }
+      );
+    }
+
+    // Ping
+    if (method === 'ping') {
+      return NextResponse.json(
+        { jsonrpc: '2.0', id, result: {} },
+        { headers: CORS_HEADERS }
+      );
     }
 
     // 1. Initialize
     if (method === 'initialize') {
-      return NextResponse.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          protocolVersion: '2024-11-05',
-          capabilities: {
-            tools: {},
-          },
-          serverInfo: {
-            name: 'slice-mcp-server',
-            version: '1.0.0',
+      return NextResponse.json(
+        {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {},
+            },
+            serverInfo: {
+              name: 'slice-mcp-server',
+              version: '1.0.0',
+            },
           },
         },
-      });
+        { headers: CORS_HEADERS }
+      );
     }
 
     // 2. Initialized notification
     if (method === 'notifications/initialized') {
-      return new Response(null, { status: 204 });
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
     // 3. Tools list
     if (method === 'tools/list') {
-      return NextResponse.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          tools: MCP_TOOLS,
+      return NextResponse.json(
+        {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            tools: MCP_TOOLS,
+          },
         },
-      });
+        { headers: CORS_HEADERS }
+      );
     }
 
     // 4. Tools call
@@ -169,46 +254,49 @@ export async function POST(request: Request) {
           break;
 
         default:
-          return NextResponse.json({
-            jsonrpc: '2.0',
-            id,
-            error: { code: -32601, message: `Tool not found: ${toolName}` },
-          });
+          return NextResponse.json(
+            {
+              jsonrpc: '2.0',
+              id,
+              error: { code: -32601, message: `Tool not found: ${toolName}` },
+            },
+            { headers: CORS_HEADERS }
+          );
       }
 
-      return NextResponse.json({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          content: [
-            {
-              type: 'text',
-              text: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2),
-            },
-          ],
+      return NextResponse.json(
+        {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [
+              {
+                type: 'text',
+                text: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2),
+              },
+            ],
+          },
         },
-      });
+        { headers: CORS_HEADERS }
+      );
     }
 
-    return NextResponse.json({
-      jsonrpc: '2.0',
-      id,
-      error: { code: -32601, message: `Method not supported: ${method}` },
-    });
+    return NextResponse.json(
+      {
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not supported: ${method}` },
+      },
+      { headers: CORS_HEADERS }
+    );
   } catch (error: any) {
-    return NextResponse.json({
-      jsonrpc: '2.0',
-      error: { code: -32603, message: error.message || 'Internal error' },
-      id: null,
-    });
+    return NextResponse.json(
+      {
+        jsonrpc: '2.0',
+        error: { code: -32603, message: error.message || 'Internal error' },
+        id: null,
+      },
+      { headers: CORS_HEADERS }
+    );
   }
-}
-
-export async function GET() {
-  return NextResponse.json({
-    name: 'Slice MCP Server',
-    description: 'Model Context Protocol (MCP) server for Slice loan management. Send JSON-RPC 2.0 POST requests to this endpoint with Authorization: Bearer <key>.',
-    protocol: '2024-11-05',
-    availableTools: MCP_TOOLS.map((t) => t.name),
-  });
 }
